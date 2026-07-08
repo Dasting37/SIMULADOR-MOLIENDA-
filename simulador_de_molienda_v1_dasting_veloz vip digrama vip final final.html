@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Simulador de Molienda - V1 Dasting Veloz</title>
+    
+    <link rel="manifest" id="pwa-manifest">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #0f172a; color: #e2e8f0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .glass-panel { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid #334155; border-radius: 0.75rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+        .input-field { background-color: #1e293b; border: 1px solid #475569; color: #38bdf8; font-weight: bold; padding: 0.4rem; border-radius: 0.375rem; width: 100%; transition: all 0.3s; font-size: 0.875rem; }
+        .input-field:focus { outline: none; border-color: #38bdf8; box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2); }
+        .input-field:disabled { color: #94a3b8; background-color: #0f172a; cursor: not-allowed; border-color: #334155; }
+        .label-text { font-size: 0.7rem; color: #94a3b8; margin-bottom: 0.15rem; display: block; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+        .highlight-value { font-size: 1.5rem; font-weight: 800; line-height: 1.2; }
+        .section-title { font-size: 1rem; font-weight: 700; color: #f8fafc; margin-bottom: 0.75rem; padding-bottom: 0.5rem; border-bottom: 1px solid #334155; display: flex; align-items: center; gap: 0.5rem; }
+        
+        @media print {
+            body { background-color: #ffffff; color: #000000; }
+            .glass-panel { background: #ffffff !important; border: 1px solid #ccc; box-shadow: none; break-inside: avoid; }
+            .print-hidden { display: none !important; }
+            .print-full-width { grid-column: span 12 / span 12 !important; width: 100% !important; }
+            .text-white, .text-slate-200, .text-slate-300, .text-slate-400 { color: #333333 !important; }
+            canvas, svg { max-height: 250px !important; }
+        }
+        
+        @keyframes flow-up { from { stroke-dashoffset: 8; } to { stroke-dashoffset: 0; } }
+        @keyframes flow-down { from { stroke-dashoffset: 0; } to { stroke-dashoffset: 8; } }
+        
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+    </style>
+</head>
+<body class="min-h-screen p-4 md:p-6 text-sm">
+
+    <div class="max-w-7xl mx-auto">
+        <header class="mb-6 flex flex-col md:flex-row items-start md:items-center justify-between border-b border-slate-700 pb-4">
+            <div>
+                <h1 class="text-xl md:text-2xl lg:text-3xl font-black text-white tracking-tight flex items-center gap-3 uppercase">
+                    <svg class="w-8 h-8 text-sky-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+                    SIMULADOR DE MOLIENDA - V1 DASTING VELOZ
+                </h1>
+                <p class="text-sky-400 font-medium text-sm mt-1">Diagrama Dinámico • Partículas de Transporte • PDF</p>
+            </div>
+            
+            <div class="mt-4 md:mt-0 flex flex-wrap gap-3 print-hidden">
+                <div class="bg-slate-800 py-2 px-3 rounded-lg border border-slate-700 flex items-center gap-2">
+                    <svg id="userIcon" class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+                    <span id="userStatusText" class="text-xs text-slate-300">Conectando...</span>
+                </div>
+                
+                <button onclick="window.saveToCloud()" id="btnSave" class="bg-indigo-600 hover:bg-indigo-500 text-white py-2 px-3 rounded-lg text-xs font-bold transition flex items-center gap-2 shadow opacity-50 cursor-not-allowed">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path></svg>
+                    <span>Guardar Cloud</span>
+                </button>
+
+                <button onclick="window.print()" class="bg-sky-600 hover:bg-sky-500 text-white py-2 px-3 rounded-lg text-xs font-bold transition flex items-center gap-2 shadow">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                    Generar PDF
+                </button>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            
+            <div class="lg:col-span-5 space-y-4 print-hidden">
+                <div class="glass-panel p-4 border-l-4 border-l-indigo-500 flex flex-col h-fit shadow-lg transition-all duration-500 overflow-hidden">
+                    <div class="flex items-center justify-between mb-4 pb-2 border-b border-slate-700">
+                        <h2 class="font-bold text-indigo-400 text-base flex items-center gap-2">
+                            1. Perfil del Pozo y Objetivos
+                        </h2>
+                        <div class="flex gap-2">
+                            <button onclick="addTramo()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-2 py-1 rounded text-xs font-bold transition shadow">+ Agregar</button>
+                            <button onclick="removeTramo()" class="bg-slate-700 hover:bg-rose-600 text-white px-2 py-1 rounded text-xs font-bold transition shadow">- Quitar</button>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-3 transition-all duration-500" id="tramos-container">
+                        <div id="tramo_1" class="bg-slate-800/50 p-3 rounded-md border border-slate-700 transition-all">
+                            <div class="flex justify-between items-center mb-2">
+                                <h3 class="text-indigo-300 font-bold text-xs uppercase tracking-wider">Tramo 1 (Superficie hacia abajo)</h3>
+                            </div>
+                            <div class="grid grid-cols-3 gap-3">
+                                <div class="col-span-2">
+                                    <label class="label-text">Especificación</label>
+                                    <select id="inpCasing1" class="input-field text-xs" onchange="updateCasingID(1); calculate();">
+                                        <option value="13.375_68.0">Csg 13-3/8" - 68.0 lb</option>
+                                        <option value="9.625_40.0">Csg 9-5/8" - 40.0 lb</option>
+                                        <option value="9.625_47.0" selected>Csg 9-5/8" - 47.0 lb</option>
+                                        <option value="7.0_29.0">Liner 7" - 29.0 lb</option>
+                                        <option value="custom">Manual</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="label-text">ID (in)</label>
+                                    <input type="number" id="inpDh1" class="input-field bg-slate-800" value="8.681" step="0.001" disabled oninput="calculate()">
+                                </div>
+                                <div class="col-span-3">
+                                    <label class="label-text text-sky-400">Profundidad en la base (MD - ft)</label>
+                                    <input type="number" id="inpProf1" class="input-field border-sky-500" value="5000" oninput="calculate()">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="tramo_2" class="bg-slate-800/50 p-3 rounded-md border border-slate-700 transition-all">
+                            <div class="flex justify-between items-center mb-2">
+                                <h3 class="text-indigo-300 font-bold text-xs uppercase tracking-wider">Tramo 2</h3>
+                            </div>
+                            <div class="grid grid-cols-3 gap-3">
+                                <div class="col-span-2">
+                                    <select id="inpCasing2" class="input-field text-xs" onchange="updateCasingID(2); calculate();">
+                                        <option value="9.625_47.0">Csg 9-5/8" - 47.0 lb</option>
+                                        <option value="7.0_29.0" selected>Liner 7" - 29.0 lb</option>
+                                        <option value="5.5_17.0">Liner 5-1/2" - 17.0 lb</option>
+                                        <option value="custom">Manual</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <input type="number" id="inpDh2" class="input-field bg-slate-800" value="6.184" step="0.001" disabled oninput="calculate()">
+                                </div>
+                                <div class="col-span-3">
+                                    <input type="number" id="inpProf2" class="input-field border-sky-500" value="9500" oninput="calculate()">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="tramo_3" class="bg-slate-800/50 p-3 rounded-md border border-slate-700 hidden transition-all">
+                            <div class="flex justify-between items-center mb-2">
+                                <h3 class="text-indigo-300 font-bold text-xs uppercase tracking-wider">Tramo 3</h3>
+                            </div>
+                            <div class="grid grid-cols-3 gap-3">
+                                <div class="col-span-2">
+                                    <select id="inpCasing3" class="input-field text-xs" onchange="updateCasingID(3); calculate();">
+                                        <option value="7.0_29.0">Liner 7" - 29.0 lb</option>
+                                        <option value="5.5_17.0" selected>Liner 5-1/2" - 17.0 lb</option>
+                                        <option value="oh_6.0">Hueco Abierto 6"</option>
+                                        <option value="custom">Manual</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <input type="number" id="inpDh3" class="input-field bg-slate-800" value="4.892" step="0.001" disabled oninput="calculate()">
+                                </div>
+                                <div class="col-span-3">
+                                    <input type="number" id="inpProf3" class="input-field border-sky-500" value="0" oninput="calculate()">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="tramo_4" class="bg-slate-800/50 p-3 rounded-md border border-slate-700 hidden transition-all">
+                            <div class="flex justify-between items-center mb-2">
+                                <h3 class="text-indigo-300 font-bold text-xs uppercase tracking-wider">Tramo 4 (Fondo)</h3>
+                            </div>
+                            <div class="grid grid-cols-3 gap-3">
+                                <div class="col-span-2">
+                                    <select id="inpCasing4" class="input-field text-xs" onchange="updateCasingID(4); calculate();">
+                                        <option value="5.5_17.0">Liner 5-1/2"</option>
+                                        <option value="oh_6.0" selected>Hueco Abierto 6"</option>
+                                        <option value="custom">Manual</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <input type="number" id="inpDh4" class="input-field bg-slate-800" value="6.000" step="0.001" disabled oninput="calculate()">
+                                </div>
+                                <div class="col-span-3">
+                                    <input type="number" id="inpProf4" class="input-field border-sky-500" value="0" oninput="calculate()">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 pt-3 border-t border-slate-700 grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="label-text text-slate-300 font-bold">OD Tubería (DP) (in)</label>
+                            <input type="number" id="inpDo" class="input-field" value="2.875" step="0.001" oninput="calculate()">
+                        </div>
+                        <div>
+                            <label class="label-text text-slate-300 font-bold">ID Tubería (DP) (in)</label>
+                            <input type="number" id="inpDi" class="input-field" value="2.441" step="0.001" oninput="calculate()">
+                        </div>
+                    </div>
+
+                    <div class="mt-3 pt-3 border-t border-slate-700 grid grid-cols-2 gap-3">
+                        <div class="bg-rose-950/20 p-2 rounded border border-rose-900/30">
+                            <label class="label-text text-rose-400 font-bold">Tope SL (ft)</label>
+                            <input type="number" id="inpSlickline" class="input-field border-rose-700/50 bg-rose-950/40 text-rose-200" value="8600" oninput="calculate()">
+                        </div>
+                        <div class="bg-emerald-950/20 p-2 rounded border border-emerald-900/30">
+                            <label class="label-text text-emerald-400 font-bold">Fondo Objetivo (ft)</label>
+                            <input type="number" id="inpObjetivo" class="input-field border-emerald-700/50 bg-emerald-950/40 text-emerald-200" value="9200" oninput="calculate()">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 gap-4">
+                    <div class="glass-panel p-5 border-l-4 border-l-sky-500 flex flex-col shadow-lg">
+                        <h2 class="section-title text-sky-400 text-sm mb-4">2. Fluido y Caudal</h2>
+                        <div class="flex flex-col sm:flex-row gap-5 flex-grow">
+                            <div class="space-y-5 flex-grow w-full">
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="label-text">Dirección</label>
+                                        <select id="inpDireccion" class="input-field text-sm py-2 text-emerald-300 border-emerald-700/50 shadow-sm bg-slate-900/60" onchange="calculate()">
+                                            <option value="Directa" selected>Directa (Sube Anular)</option>
+                                            <option value="Inversa">Inversa (Sube DP)</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="label-text">Tipo Fluido</label>
+                                        <select id="inpFluidType" class="input-field text-sm py-2 text-white shadow-sm bg-slate-900/60" onchange="updateFluidProperties(); calculate();">
+                                            <option value="Lodo" selected>Lodo Perforación</option>
+                                            <option value="Control">Agua/Salmuera</option>
+                                            <option value="Pildora">Píldora Viscosa</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                
+                                <div class="bg-slate-900/80 p-4 rounded-xl border border-sky-900/50 shadow-[inset_0_2px_4px_rgba(0,0,0,0.4)] relative overflow-hidden">
+                                    <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-sky-600 to-cyan-400 opacity-50"></div>
+                                    <label class="label-text text-sky-400 mb-2 font-bold tracking-widest text-[0.65rem]">Caudal Principal (Q - GPM)</label>
+                                    <input type="number" id="inpQ" class="input-field text-3xl font-black text-center py-2 border-sky-500/50 bg-slate-800 text-white transition-all focus:border-sky-400 focus:shadow-[0_0_15px_rgba(56,189,248,0.2)]" value="150" oninput="calculate()">
+                                </div>
+                                
+                                <div class="grid grid-cols-3 gap-3">
+                                    <div class="bg-slate-800/80 p-2.5 rounded-lg border border-slate-700 text-center">
+                                        <label class="label-text">MW</label>
+                                        <input type="number" id="inpMw" class="input-field text-center text-sm px-1 py-1.5 bg-slate-900/50" value="9.5" step="0.1" oninput="calculate()">
+                                    </div>
+                                    <div class="bg-slate-800/80 p-2.5 rounded-lg border border-slate-700 text-center">
+                                        <label class="label-text">PV</label>
+                                        <input type="number" id="inpPv" class="input-field text-center text-sm px-1 py-1.5 bg-slate-900/50" value="18" oninput="calculate()">
+                                    </div>
+                                    <div class="bg-slate-800/80 p-2.5 rounded-lg border border-slate-700 text-center">
+                                        <label class="label-text">YP</label>
+                                        <input type="number" id="inpYp" class="input-field text-center text-sm px-1 py-1.5 bg-slate-900/50" value="12" oninput="calculate()">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="w-full sm:w-32 shrink-0 bg-slate-900/80 rounded-xl border border-slate-700/60 p-2 flex flex-col items-center justify-between shadow-inner">
+                                <span id="lblFlujoDir" class="text-[0.6rem] text-sky-400 font-bold uppercase text-center w-full leading-tight">Flujo<br>Directo</span>
+                                <div class="relative w-full flex-grow flex items-center justify-center my-2">
+                                    <svg viewBox="0 0 60 120" class="w-16 h-28 drop-shadow-md">
+                                        <path d="M 10 0 L 10 110 C 10 115, 50 115, 50 110 L 50 0" fill="none" stroke="#475569" stroke-width="4"/>
+                                        <rect x="25" y="0" width="10" height="100" fill="#94a3b8" rx="1"/>
+                                        <path id="arr-anular-izq" d="M 17 110 L 17 0" fill="none" stroke="#38bdf8" stroke-width="2" stroke-dasharray="4 4" style="animation: flow-up 0.8s linear infinite;"/>
+                                        <path id="arr-anular-der" d="M 43 110 L 43 0" fill="none" stroke="#38bdf8" stroke-width="2" stroke-dasharray="4 4" style="animation: flow-up 0.8s linear infinite;"/>
+                                        <path id="arr-tuberia" d="M 30 0 L 30 100" fill="none" stroke="#64748b" stroke-width="2" stroke-dasharray="4 4" style="animation: flow-down 0.8s linear infinite;"/>
+                                    </svg>
+                                </div>
+                                <span class="text-[0.5rem] text-slate-500 uppercase font-bold tracking-widest">Esquema</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="glass-panel p-5 border-l-4 border-l-orange-500 flex flex-col shadow-lg">
+                        <h2 class="section-title text-orange-400 text-sm mb-4">3. Molienda / Torque</h2>
+                        <div class="space-y-6 flex-grow flex flex-col">
+                            <div class="flex-grow">
+                                <label class="label-text">Material Generado</label>
+                                <select id="inpMaterial" class="input-field text-sm py-2.5 text-white bg-slate-900/60 shadow-sm" onchange="calculate()">
+                                    <option value="Metal">Viruta Metálica (65 ppg)</option>
+                                    <option value="Cemento">Cemento (26 ppg)</option>
+                                    <option value="Arena">Arena/Sólidos (22 ppg)</option>
+                                </select>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4 mt-auto">
+                                <div class="bg-slate-800/80 p-4 rounded-xl border border-slate-700 shadow-inner flex flex-col justify-center">
+                                    <label class="label-text text-slate-300 mb-1">Mesa (in)</label>
+                                    <input type="number" id="inpMesa" class="input-field text-xl text-center font-bold py-2 bg-slate-900/50" value="29.0" oninput="calculate()">
+                                </div>
+                                <div class="bg-orange-900/20 p-4 rounded-xl border border-orange-800/40 shadow-inner flex flex-col justify-center">
+                                    <label class="label-text text-orange-300 mb-1">M/U TQ Max</label>
+                                    <input type="number" id="inpTq" class="input-field text-xl text-center font-bold py-2 border-orange-700/50 bg-orange-950/30 text-orange-100" value="4600" oninput="calculate()">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PANEL DERECHO: ORGANIZADO -->
+            <div class="lg:col-span-7 space-y-4 print-full-width">
+                
+                <!-- 1. KPIs -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div class="glass-panel p-3 text-center border-t-2 border-t-pink-500 shadow-md">
+                        <span class="label-text text-pink-400">Presión (SPP) Est.</span>
+                        <div class="highlight-value text-white"><span id="outSPP">0</span> <span class="text-xs text-slate-400">psi</span></div>
+                    </div>
+                    <div id="panelVaCrit" class="glass-panel p-3 text-center border-t-2 border-t-rose-500 transition-colors shadow-md">
+                        <span id="labelVaCrit" class="label-text text-rose-400">Velocidad Mínima (Zona Crítica)</span>
+                        <div class="highlight-value text-rose-300"><span id="outVaCrit">0.0</span> <span class="text-xs text-slate-400">ft/m</span></div>
+                    </div>
+                    <div class="glass-panel p-3 text-center border-t-2 border-t-indigo-500 shadow-md">
+                        <span class="label-text text-indigo-400">Fondo Arriba Total</span>
+                        <div class="highlight-value text-white"><span id="outLag">0.0</span> <span class="text-xs text-slate-400">min</span></div>
+                    </div>
+                    <div class="glass-panel p-3 text-center border-t-2 border-t-orange-500 shadow-md">
+                        <span class="label-text text-orange-400">Unid. Torque Relativo</span>
+                        <div class="highlight-value text-orange-300"><span id="outTqLim">0</span> <span class="text-xs text-slate-400">Pts</span></div>
+                    </div>
+                </div>
+
+                <!-- 2. GRÁFICO DE BARRAS ANIMADO (Debajo de los KPIs) -->
+                <div class="glass-panel p-4 shadow-lg flex flex-col">
+                    <div class="flex justify-between items-center mb-2">
+                        <h3 class="section-title text-sm m-0 border-0 pb-0 w-full text-center text-sky-400">Velocidades de Arrastre (Análisis Dinámico)</h3>
+                    </div>
+                    <div class="w-full flex-grow relative min-h-[250px] bg-slate-900/60 rounded border border-slate-700 overflow-hidden shadow-inner">
+                        <canvas id="animatedSimCanvas" class="absolute top-0 left-0 w-full h-full"></canvas>
+                    </div>
+                </div>
+
+                <!-- 3. RESUMEN Y ALERTAS -->
+                <div class="glass-panel p-4 bg-gradient-to-r from-slate-800 to-slate-900 shadow-lg">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div class="flex items-start gap-2 bg-slate-900/80 p-2.5 rounded border border-emerald-900/50">
+                            <svg class="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                            <p class="text-xs text-slate-300"><strong>Pauta Operativa:</strong> Circular <strong class="text-emerald-400" id="outFondos">--</strong> fondos arriba basándose en la zona crítica. Tiempo requerido: <strong class="text-white" id="outTime">--</strong> mins.</p>
+                        </div>
+                        <div class="flex items-start gap-2 bg-slate-900/80 p-2.5 rounded border border-rose-900/50 flex-col">
+                            <div class="flex gap-2">
+                                <svg class="w-5 h-5 text-rose-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                                <p class="text-xs text-slate-300"><strong>Diagnóstico Físico:</strong> <span id="outAlertaTxt">--</span></p>
+                            </div>
+                            <span id="outRecomendacion" class="mt-2 text-[0.7rem] text-sky-400 w-full font-medium bg-sky-900/20 p-2 rounded hidden border border-sky-800/40"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. DISTRIBUCIÓN DE VOLÚMENES -->
+                <div class="glass-panel p-4 shadow-lg">
+                    <h3 class="section-title text-sm">Distribución de Volúmenes y Tiempos por Tramo</h3>
+                    <div class="flex justify-between items-end mb-3 pb-2 border-b border-slate-700/50">
+                        <span class="text-xs font-bold text-white uppercase">Volumen Total del Sistema</span>
+                        <span class="text-xl font-black text-emerald-400"><span id="outVolTotal">0</span> <span class="text-xs text-slate-400 font-normal">bbl</span></span>
+                    </div>
+                    
+                    <div id="desgloseAnularContainer" class="space-y-2 mb-2 max-h-[160px] overflow-y-auto pr-2">
+                        <!-- Tramos dinámicos aquí -->
+                    </div>
+
+                    <div id="uiTuberiaContainer" class="flex items-center justify-between p-2 bg-slate-800 rounded border border-slate-700 mt-2 transition-colors">
+                        <div class="flex items-center gap-2">
+                            <div class="w-1.5 h-6 bg-slate-400 rounded-sm"></div>
+                            <div>
+                                <p id="uiTuberiaText" class="text-[0.65rem] text-slate-400 font-bold uppercase">Sarta Interna (Viaje Sup a Fondo)</p>
+                                <p class="font-bold text-white text-sm"><span id="outVolInt">0</span> bbl</p>
+                            </div>
+                        </div>
+                        <p class="text-sm font-bold text-slate-300"><span id="outTimeInt">0</span> min</p>
+                    </div>
+                </div>
+
+                <!-- 5. ESQUEMA MECÁNICO DEL POZO (AL FINAL) -->
+                <div class="glass-panel p-4 shadow-lg flex flex-col">
+                    <div class="flex justify-between items-center mb-2">
+                        <h3 class="section-title text-sm m-0 border-0 pb-0 w-full text-center text-indigo-300">Esquema Mecánico del Pozo</h3>
+                    </div>
+                    <div class="w-full flex-grow relative min-h-[450px] bg-slate-900/60 rounded border border-slate-700 overflow-hidden shadow-inner flex justify-center items-center">
+                        <svg id="wellboreSvg" class="h-full w-auto max-w-full drop-shadow-lg p-2"></svg>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        try { const app = initializeApp({}); const auth = getAuth(app); signInAnonymously(auth); } catch(e) {}
+    </script>
+
+    <script>
+        let visibleTramos = 2;
+        const maxTramos = 4;
+        const casingDB = {
+            "13.375_68.0": { id: 12.415 }, "9.625_40.0": { id: 8.835 }, "9.625_43.5": { id: 8.755 }, "9.625_47.0": { id: 8.681 },
+            "9.625_53.5": { id: 8.535 }, "7.0_23.0": { id: 6.366 }, "7.0_26.0": { id: 6.276 }, "7.0_29.0": { id: 6.184 },
+            "5.5_14.0": { id: 5.012 }, "5.5_15.5": { id: 4.950 }, "5.5_17.0": { id: 4.892 },
+            "oh_8.5": { id: 8.500 }, "oh_6.125": { id: 6.125 }, "oh_6.0": { id: 6.000 }, "oh_4.5": { id: 4.500 }, "custom": { id: 0 }
+        };
+
+        function addTramo() { if (visibleTramos < maxTramos) { visibleTramos++; document.getElementById(`tramo_${visibleTramos}`).classList.remove('hidden'); document.getElementById(`inpProf${visibleTramos}`).value = (parseFloat(document.getElementById(`inpProf${visibleTramos-1}`).value) || 0) + 1000; calculate(); } }
+        function removeTramo() { if (visibleTramos > 1) { document.getElementById(`tramo_${visibleTramos}`).classList.add('hidden'); document.getElementById(`inpProf${visibleTramos}`).value = 0; visibleTramos--; calculate(); } }
+        function updateCasingID(t) { const s = document.getElementById(`inpCasing${t}`).value; const idInp = document.getElementById(`inpDh${t}`); if (s === "custom") { idInp.disabled = false; idInp.classList.remove("bg-slate-800"); idInp.focus(); } else { idInp.disabled = true; idInp.classList.add("bg-slate-800"); idInp.value = casingDB[s].id.toFixed(3); } }
+        function updateFluidProperties() { const t = document.getElementById('inpFluidType').value; const pv = document.getElementById('inpPv'); const yp = document.getElementById('inpYp'); if (t === 'Control') { pv.value = 2; yp.value = 1; pv.disabled = true; yp.disabled = true; } else if (t === 'Lodo') { if(pv.disabled){pv.value = 18; yp.value = 12;} pv.disabled = false; yp.disabled = false; } else if (t === 'Pildora') { if(pv.disabled || pv.value < 30){pv.value = 35; yp.value = 40;} pv.disabled = false; yp.disabled = false; } }
+
+        const animEngine = {
+            canvas: null, ctx: null, width: 0, height: 0,
+            bars: [], particles: [], maxVal: 100, fluidType: 'Lodo', materialType: 'Metal',
+            init() { this.canvas = document.getElementById('animatedSimCanvas'); this.ctx = this.canvas.getContext('2d'); this.resize(); window.addEventListener('resize', () => this.resize()); requestAnimationFrame(() => this.loop()); },
+            resize() { const rect = this.canvas.parentElement.getBoundingClientRect(); const dpr = window.devicePixelRatio || 1; this.canvas.width = rect.width * dpr; this.canvas.height = rect.height * dpr; this.ctx.scale(dpr, dpr); this.width = rect.width; this.height = rect.height; },
+            updateData(barsData, fType, mType) { this.fluidType = fType; this.materialType = mType; this.maxVal = Math.max(10, ...barsData.map(b => b.val)) * 1.2; barsData.forEach((newData, i) => { if(!this.bars[i]) { this.bars[i] = { ...newData, currentVal: 0 }; } else { this.bars[i].label = newData.label; this.bars[i].val = newData.val; this.bars[i].type = newData.type; } }); if(this.bars.length > barsData.length) this.bars.length = barsData.length; },
+            spawnParticle(barIndex, barRect, isGravity) { const p = { barIdx: barIndex, x: barRect.x + 5 + Math.random() * (barRect.w - 10), y: 0, size: 2, speed: 1, color: '#fff', life: Math.random() * 0.5, shape: 'circle' }; if (isGravity) { p.y = barRect.y - 10; p.speed = 1.5 + Math.random() * 2.5; p.shape = 'square'; if (this.materialType === 'Metal') { p.size = 2 + Math.random()*3; p.color = '#94a3b8'; } else if (this.materialType === 'Cemento') { p.size = 3 + Math.random()*3; p.color = '#f1f5f9'; } else { p.size = 1.5 + Math.random()*2; p.color = '#d97706'; } } else { p.y = barRect.y + barRect.h + 10; if (this.fluidType === 'Control') { p.speed = -(2 + Math.random() * 3); p.size = 1 + Math.random() * 3; p.color = 'rgba(255, 255, 255, 0.6)'; } else if (this.fluidType === 'Lodo') { p.speed = -(1 + Math.random() * 1.5); p.size = 2 + Math.random() * 4; p.color = 'rgba(60, 40, 20, 0.4)'; } else { p.speed = -(0.5 + Math.random() * 0.8); p.size = 4 + Math.random() * 8; p.color = 'rgba(20, 80, 20, 0.5)'; } } this.particles.push(p); },
+            loop() { this.ctx.clearRect(0, 0, this.width, this.height); this.ctx.fillStyle = '#64748b'; this.ctx.font = '10px Segoe UI'; this.ctx.textAlign = 'right'; for(let i=0; i<=4; i++) { const yVal = (this.maxVal / 4) * i; const yPos = this.height - 30 - ((yVal / this.maxVal) * (this.height - 50)); this.ctx.fillText(yVal.toFixed(0), 30, yPos + 3); this.ctx.fillStyle = 'rgba(51, 65, 85, 0.3)'; this.ctx.fillRect(35, yPos, this.width, 1); this.ctx.fillStyle = '#64748b'; } const barSpacing = (this.width - 50) / this.bars.length; const barWidth = Math.min(barSpacing * 0.6, 60); this.bars.forEach((bar, i) => { bar.currentVal += (bar.val - bar.currentVal) * 0.1; const barHeight = (bar.currentVal / this.maxVal) * (this.height - 50); const bx = 50 + (i * barSpacing) + (barSpacing/2) - (barWidth/2); const by = this.height - 30 - barHeight; let bgGrad = this.ctx.createLinearGradient(bx, by, bx, by + barHeight); if (bar.type === 'gravity') { bgGrad.addColorStop(0, 'rgba(239, 68, 68, 0.5)'); bgGrad.addColorStop(1, 'rgba(153, 27, 27, 0.1)'); } else { if (this.fluidType === 'Control') { bgGrad.addColorStop(0, 'rgba(56, 189, 248, 0.6)'); bgGrad.addColorStop(1, 'rgba(3, 105, 161, 0.1)'); } else if (this.fluidType === 'Lodo') { bgGrad.addColorStop(0, 'rgba(180, 130, 80, 0.7)'); bgGrad.addColorStop(1, 'rgba(80, 50, 20, 0.2)'); } else { bgGrad.addColorStop(0, 'rgba(132, 204, 22, 0.7)'); bgGrad.addColorStop(1, 'rgba(63, 98, 18, 0.2)'); } } this.ctx.fillStyle = bgGrad; this.ctx.beginPath(); this.ctx.roundRect(bx, by, barWidth, barHeight, [4, 4, 0, 0]); this.ctx.fill(); this.ctx.strokeStyle = bar.type === 'gravity' ? '#f87171' : '#38bdf8'; this.ctx.lineWidth = 1; this.ctx.stroke(); this.ctx.fillStyle = '#cbd5e1'; this.ctx.textAlign = 'center'; this.ctx.font = 'bold 11px Segoe UI'; this.ctx.fillText(bar.label, bx + barWidth/2, this.height - 10); this.ctx.fillStyle = '#fff'; this.ctx.fillText(bar.currentVal.toFixed(1), bx + barWidth/2, by - 5); const spawnRate = bar.type === 'gravity' ? 0.2 : (this.fluidType==='Control' ? 0.4 : (this.fluidType==='Lodo'? 0.2 : 0.05)); if(Math.random() < spawnRate && bar.currentVal > 5) { this.spawnParticle(i, {x: bx, y: by, w: barWidth, h: barHeight}, bar.type === 'gravity'); } this.ctx.save(); this.ctx.beginPath(); this.ctx.roundRect(bx, by, barWidth, barHeight, [4, 4, 0, 0]); this.ctx.clip(); for(let p = this.particles.length - 1; p >= 0; p--) { let pt = this.particles[p]; if(pt.barIdx === i) { pt.y += pt.speed; this.ctx.fillStyle = pt.color; this.ctx.beginPath(); if(pt.shape === 'circle') { this.ctx.arc(pt.x, pt.y, pt.size, 0, Math.PI*2); } else { this.ctx.save(); this.ctx.translate(pt.x, pt.y); this.ctx.rotate(pt.life * 10); this.ctx.fillRect(-pt.size/2, -pt.size/2, pt.size, pt.size); this.ctx.restore(); } this.ctx.fill(); pt.life += 0.01; if(pt.y < by - 20 || pt.y > by + barHeight + 20) { this.particles.splice(p, 1); } } } this.ctx.restore(); }); requestAnimationFrame(() => this.loop()); }
+        };
+
+        function renderWellbore(tramos, dpOD, slickline, objetivo) {
+            const svg = document.getElementById('wellboreSvg');
+            if(!svg) return;
+
+            let maxProf = tramos.length > 0 ? tramos[tramos.length - 1].Prof : 0;
+            maxProf = Math.max(maxProf, slickline, objetivo);
+            if (maxProf === 0) maxProf = 1000;
+
+            const margin = maxProf * 0.08; 
+            const totalHeight = maxProf + (margin * 2);
+            
+            const vW = 320; 
+            const vH = 600;
+            svg.setAttribute('viewBox', `0 0 ${vW} ${vH}`);
+            
+            const scaleY = vH / totalHeight;
+            const scaleX = 6; 
+            const centerX = 90; 
+            
+            let html = '';
+            
+            let prevProf = 0;
+            let lastW = 0;
+            
+            tramos.forEach((t) => {
+                let y1 = (prevProf + margin) * scaleY;
+                let y2 = (t.Prof + margin) * scaleY;
+                let w = t.Dh * scaleX;
+                let x = centerX - (w / 2);
+                html += `<rect x="${x}" y="${y1}" width="${w}" height="${y2-y1}" fill="rgba(30,41,59,0.8)" stroke="#94a3b8" stroke-width="2"/>`;
+                prevProf = t.Prof;
+                lastW = w;
+            });
+
+            if (slickline > 0 && objetivo > slickline && slickline <= maxProf) {
+                let sy = (slickline + margin) * scaleY;
+                let oy = (Math.min(objetivo, maxProf) + margin) * scaleY;
+                let hw = lastW > 0 ? lastW - 4 : 40;
+                let hx = centerX - (hw / 2);
+                html += `<rect x="${hx}" y="${sy}" width="${hw}" height="${oy - sy}" fill="url(#millHatch)" opacity="0.6"/>`;
+                html += `<rect x="${hx}" y="${sy}" width="${hw}" height="${oy - sy}" fill="rgba(239,68,68,0.2)"/>`;
+            }
+
+            if (tramos.length > 0) {
+                let sartaProf = (slickline > 0 && slickline <= maxProf) ? slickline : maxProf;
+                let dpW = dpOD * scaleX;
+                let dpX = centerX - (dpW / 2);
+                let dpY2 = (sartaProf + margin) * scaleY;
+                
+                html += `<rect x="${dpX}" y="${margin*scaleY}" width="${dpW}" height="${dpY2 - (margin*scaleY) - 8}" fill="#cbd5e1" stroke="#334155" stroke-width="1"/>`;
+                
+                let bitW = dpW * 2.5; 
+                let bitX = centerX - (bitW / 2);
+                html += `<polygon points="${bitX},${dpY2 - 8} ${bitX+bitW},${dpY2 - 8} ${bitX+bitW*0.8},${dpY2} ${bitX+bitW*0.2},${dpY2}" fill="#f59e0b" stroke="#b45309" stroke-width="1.5"/>`;
+            }
+
+            if (slickline > 0 || objetivo > 0) {
+                let trueSy = (slickline + margin) * scaleY;
+                let trueOy = (objetivo + margin) * scaleY;
+                
+                let labelSy = trueSy;
+                let labelOy = trueOy;
+                let labelMy = (trueSy + trueOy) / 2;
+
+                const boxH = 20;
+                const minSpacing = 26; 
+                
+                if (slickline > 0 && objetivo > slickline) {
+                    if ((labelOy - labelSy) < (minSpacing * 2)) {
+                        labelSy = labelMy - minSpacing;
+                        labelOy = labelMy + minSpacing;
+                    }
+                }
+
+                const boxLeft = 165; 
+                const boxW = 130; 
+                const textX = boxLeft + boxW / 2;
+                
+                const drawLabel = (trueY, labelY, text, color, bgColor) => {
+                    let res = '';
+                    res += `<polyline points="${centerX},${trueY} ${boxLeft-15},${trueY} ${boxLeft},${labelY}" fill="none" stroke="${color}" stroke-width="1.5" stroke-dasharray="4 2" opacity="0.8"/>`;
+                    res += `<rect x="${boxLeft}" y="${labelY - boxH/2}" width="${boxW}" height="${boxH}" fill="${bgColor}" rx="3" stroke="${color}" stroke-width="1"/>`;
+                    res += `<text x="${textX}" y="${labelY + 4}" fill="${color}" font-size="11" font-weight="bold" font-family="sans-serif" text-anchor="middle">${text}</text>`;
+                    return res;
+                };
+
+                if (slickline > 0) {
+                    html += `<line x1="${centerX - 35}" y1="${trueSy}" x2="${centerX + 35}" y2="${trueSy}" stroke="#ef4444" stroke-width="2" stroke-dasharray="4 2"/>`;
+                    html += drawLabel(trueSy, labelSy, `TOPE SL: ${slickline}'`, '#ef4444', 'rgba(15,23,42,0.95)');
+                }
+                
+                if (objetivo > 0) {
+                    html += `<line x1="${centerX - 35}" y1="${trueOy}" x2="${centerX + 35}" y2="${trueOy}" stroke="#10b981" stroke-width="2"/>`;
+                    html += drawLabel(trueOy, labelOy, `FONDO OBJ: ${objetivo}'`, '#10b981', 'rgba(15,23,42,0.95)');
+                }
+
+                if (slickline > 0 && objetivo > slickline) {
+                    html += `<path d="M ${boxLeft-6} ${labelSy+10} L ${boxLeft-10} ${labelSy+10} L ${boxLeft-10} ${labelOy-10} L ${boxLeft-6} ${labelOy-10}" fill="none" stroke="#f59e0b" stroke-width="1.5" opacity="0.8"/>`;
+                    html += `<rect x="${boxLeft}" y="${labelMy - boxH/2}" width="${boxW}" height="${boxH}" fill="rgba(15,23,42,0.95)" rx="3" stroke="#f59e0b" stroke-width="1"/>`;
+                    html += `<text x="${textX}" y="${labelMy + 4}" fill="#f59e0b" font-size="11" font-weight="bold" font-family="sans-serif" text-anchor="middle">MOLER: ${(objetivo - slickline).toFixed(0)}'</text>`;
+                }
+            }
+            
+            const defs = `
+            <defs>
+                <pattern id="millHatch" width="8" height="8" patternUnits="userSpaceOnUse">
+                    <path d="M-2,2 l4,-4 M0,8 l8,-8 M6,10 l4,-4" stroke="#ef4444" stroke-width="1.5" />
+                </pattern>
+            </defs>`;
+
+            svg.innerHTML = defs + html;
+        }
+
+        function calculate() {
+            const Do = parseFloat(document.getElementById('inpDo').value) || 0.1;
+            const Di = parseFloat(document.getElementById('inpDi').value) || 0.1;
+            const Q = parseFloat(document.getElementById('inpQ').value) || 0;
+            const Mw = parseFloat(document.getElementById('inpMw').value) || 1;
+            const Pv = parseFloat(document.getElementById('inpPv').value) || 1;
+            const Yp = parseFloat(document.getElementById('inpYp').value) || 1;
+            const Material = document.getElementById('inpMaterial').value;
+            const Mesa = parseFloat(document.getElementById('inpMesa').value) || 1;
+            const MUtq = parseFloat(document.getElementById('inpTq').value) || 0;
+            const direccion = document.getElementById('inpDireccion').value;
+            const fluidType = document.getElementById('inpFluidType').value;
+            
+            const slickline = parseFloat(document.getElementById('inpSlickline').value) || 0;
+            const objetivo = parseFloat(document.getElementById('inpObjetivo').value) || 0;
+
+            const arrAnularIzq = document.getElementById('arr-anular-izq');
+            const arrAnularDer = document.getElementById('arr-anular-der');
+            const arrTuberia = document.getElementById('arr-tuberia');
+            const lblFlujo = document.getElementById('lblFlujoDir');
+            
+            if (direccion === 'Directa') {
+                arrAnularIzq.style.animation = 'flow-up 0.8s linear infinite';
+                arrAnularDer.style.animation = 'flow-up 0.8s linear infinite';
+                arrTuberia.style.animation = 'flow-down 0.8s linear infinite';
+                arrAnularIzq.setAttribute('stroke', '#38bdf8');
+                arrAnularDer.setAttribute('stroke', '#38bdf8');
+                arrTuberia.setAttribute('stroke', '#64748b');
+                lblFlujo.innerHTML = 'Flujo<br>Directo';
+                lblFlujo.className = 'text-[0.6rem] text-sky-400 font-bold uppercase text-center w-full leading-tight';
+            } else {
+                arrAnularIzq.style.animation = 'flow-down 0.8s linear infinite';
+                arrAnularDer.style.animation = 'flow-down 0.8s linear infinite';
+                arrTuberia.style.animation = 'flow-up 0.8s linear infinite';
+                arrAnularIzq.setAttribute('stroke', '#64748b');
+                arrAnularDer.setAttribute('stroke', '#64748b');
+                arrTuberia.setAttribute('stroke', '#10b981');
+                lblFlujo.innerHTML = 'Flujo<br>Inverso';
+                lblFlujo.className = 'text-[0.6rem] text-emerald-400 font-bold uppercase text-center w-full leading-tight';
+            }
+
+            let prevProf = 0;
+            let volAnularTotal = 0;
+            let P_ann_total = 0;
+            let VaCritica = Infinity;
+            let tramoCritico = 0;
+            let areaCritica = 0;
+            let tramosActivos = [];
+
+            for (let i = 1; i <= visibleTramos; i++) {
+                const Dh = parseFloat(document.getElementById(`inpDh${i}`).value) || 1;
+                let Prof = parseFloat(document.getElementById(`inpProf${i}`).value) || 0;
+                
+                if (Prof <= prevProf) continue; 
+                const L = Prof - prevProf;
+                
+                if (L > 0) {
+                    let volAnular = 0, Va = 0, P_ann = 0;
+                    if (Dh > Do) {
+                        const areaAnular = (Dh*Dh - Do*Do);
+                        const capAnular = areaAnular / 1029.4;
+                        volAnular = capAnular * L;
+                        Va = (24.5 * Q) / areaAnular;
+                        
+                        const V_ann_fps = Q / (2.448 * areaAnular);
+                        const DhDo = Dh - Do;
+                        P_ann = ((Pv * V_ann_fps * L) / (1500 * DhDo*DhDo)) + ((Yp * L) / (225 * DhDo));
+                        
+                        if (Va < VaCritica) { VaCritica = Va; tramoCritico = i; areaCritica = areaAnular; }
+                    }
+                    volAnularTotal += volAnular;
+                    P_ann_total += P_ann;
+                    tramosActivos.push({ id: i, Dh, L, Prof, volAnular, Va });
+                    prevProf = Prof;
+                }
+            }
+
+            if(VaCritica === Infinity) VaCritica = 0;
+            const ProfundidadTotal = prevProf;
+
+            const capInterna = (Di*Di) / 1029.4;
+            const volInterno = capInterna * ProfundidadTotal;
+            const volTotalSistema = volAnularTotal + volInterno;
+            
+            const timeInt = Q > 0 ? (volInterno / (Q / 42)) : 0;
+            const lagTimeAnular = Q > 0 ? (volAnularTotal / (Q / 42)) : 0;
+            
+            let lagTime = lagTimeAnular;
+            let VaInterna = 0;
+            if (Di > 0) VaInterna = (24.5 * Q) / (Di * Di);
+
+            if (direccion === 'Inversa') { lagTime = timeInt; VaCritica = VaInterna; areaCritica = Di * Di; }
+
+            document.getElementById('outVolTotal').innerText = Math.round(volTotalSistema);
+            document.getElementById('outVolInt').innerText = volInterno.toFixed(1);
+            document.getElementById('outTimeInt').innerText = timeInt.toFixed(1);
+            document.getElementById('outLag').innerText = lagTime.toFixed(1);
+            document.getElementById('outVaCrit').innerText = VaCritica.toFixed(0); 
+            
+            const labelVa = document.getElementById('labelVaCrit');
+            const panelVa = document.getElementById('panelVaCrit');
+            const divVaNum = document.getElementById('outVaCrit').parentElement;
+            if (direccion === 'Inversa') {
+                labelVa.innerText = "Vel. Ascenso (Interna DP)";
+                labelVa.className = "label-text text-emerald-400";
+                panelVa.classList.replace('border-t-rose-500', 'border-t-emerald-500');
+                divVaNum.className = "highlight-value text-emerald-300";
+            } else {
+                labelVa.innerText = "Velocidad Mínima (Zona Crítica)";
+                labelVa.className = "label-text text-rose-400";
+                panelVa.classList.replace('border-t-emerald-500', 'border-t-rose-500');
+                divVaNum.className = "highlight-value text-rose-300";
+            }
+
+            const desgloseContainer = document.getElementById('desgloseAnularContainer');
+            desgloseContainer.innerHTML = ''; 
+            
+            [...tramosActivos].reverse().forEach(t => {
+                const isCritico = (t.id === tramoCritico) && (direccion === 'Directa');
+                desgloseContainer.innerHTML += `
+                    <div class="flex items-center justify-between p-2 ${isCritico ? 'bg-rose-900/20 border-rose-800/50' : 'bg-slate-800/50 border-slate-700'} rounded border ${direccion === 'Inversa' ? 'opacity-40 grayscale' : ''}">
+                        <div class="flex items-center gap-2">
+                            <div class="w-1.5 h-6 ${isCritico ? 'bg-rose-500' : 'bg-sky-500'} rounded-sm"></div>
+                            <div>
+                                <p class="text-[0.65rem] ${isCritico ? 'text-rose-400' : 'text-sky-400'} font-bold uppercase">Tramo ${t.id} ${isCritico ? ' - LENTO' : ''}</p>
+                                <div class="flex gap-2 text-sm">
+                                    <span class="font-bold text-white">${t.volAnular.toFixed(1)} bbl</span>
+                                    <span class="${isCritico ? 'text-rose-400 font-bold' : 'text-slate-400'}">| Va: ${t.Va.toFixed(1)} ft/min</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            const uiTuberiaContainer = document.getElementById('uiTuberiaContainer');
+            const uiTuberiaText = document.getElementById('uiTuberiaText');
+            if (direccion === 'Inversa') {
+                uiTuberiaContainer.classList.remove('bg-slate-800', 'border-slate-700');
+                uiTuberiaContainer.classList.add('bg-emerald-900/40', 'border-emerald-500/50');
+                uiTuberiaText.innerText = "SARTA INTERNA (VÍA PRINCIPAL DE RETORNO)";
+                uiTuberiaText.classList.replace('text-slate-400', 'text-emerald-400');
+            } else {
+                uiTuberiaContainer.classList.add('bg-slate-800', 'border-slate-700');
+                uiTuberiaContainer.classList.remove('bg-emerald-900/40', 'border-emerald-500/50');
+                uiTuberiaText.innerText = "SARTA INTERNA (VIAJE SUP A FONDO)";
+                uiTuberiaText.classList.replace('text-emerald-400', 'text-slate-400');
+            }
+
+            let den_s = 65, dia_eq = 0.25;
+            if(Material === "Cemento") { den_s = 26; dia_eq = 0.15; }
+            if(Material === "Arena") { den_s = 22; dia_eq = 0.10; }
+            let Vs = 0;
+            if(den_s > Mw) { Vs = 113.4 * Math.sqrt(dia_eq * ((den_s - Mw) / Mw)); }
+            
+            const Vn = VaCritica - Vs; 
+            const statusEl = document.getElementById('outAlertaTxt');
+            const recEl = document.getElementById('outRecomendacion');
+            recEl.classList.add('hidden');
+            
+            let Q_opt = Math.ceil(((Vs + 35) * areaCritica) / 24.5); 
+            if (!isFinite(Q_opt) || Q_opt < 0) Q_opt = 0;
+
+            if (tramosActivos.length === 0) {
+                statusEl.innerText = "Configure al menos un tramo válido.";
+            } else if (direccion === 'Inversa') {
+                if(Vn <= 0) {
+                    statusEl.innerText = `Velocidad dentro del DP insuficiente. Riesgo de taponamiento de sarta.`;
+                    recEl.innerHTML = `💡 <b>Recomendación Óptima:</b> Incrementar caudal a mínimo <b>${Q_opt} gpm</b>.`;
+                    recEl.classList.remove('hidden');
+                } else {
+                    statusEl.innerText = `Excelente empuje interno (${VaCritica.toFixed(0)} ft/min). CUIDADO: La chatarra no debe exceder los ${Di}".`;
+                }
+            } else {
+                if(Vn <= 0) {
+                    statusEl.innerText = `El lodo se frena demasiado al entrar al Tramo ${tramoCritico} (el más ancho). La gravedad le ganará al fluido y la chatarra se caerá.`;
+                    recEl.innerHTML = `💡 <b>Recomendación Óptima:</b> Subir caudal a <b>${Q_opt} gpm</b> para superar la gravedad en esta sección.`;
+                    recEl.classList.remove('hidden');
+                } else if (Vn < 30) {
+                    statusEl.innerText = `El ascenso es muy lento en el Tramo ${tramoCritico}. Considere bombear una píldora viscosa.`;
+                    recEl.innerHTML = `💡 <b>Recomendación Óptima:</b> Para alcanzar un transporte seguro, eleve el caudal a <b>${Q_opt} gpm</b>.`;
+                    recEl.classList.remove('hidden');
+                } else {
+                    statusEl.innerText = `Incluso en el Tramo ${tramoCritico} (el más ancho), la velocidad supera a la gravedad de los sólidos.`;
+                }
+            }
+
+            const fondos = VaCritica < 100 ? 2.5 : (VaCritica < 130 ? 2.0 : 1.5);
+            document.getElementById('outFondos').innerText = fondos.toFixed(1);
+            document.getElementById('outTime').innerText = (fondos * lagTime).toFixed(0);
+
+            let P_pipe = 0;
+            if(Di > 0) {
+                const V_pipe = Q / (2.448 * Di*Di);
+                P_pipe = ((Pv * V_pipe * ProfundidadTotal) / (1500 * Di*Di)) + ((Yp * ProfundidadTotal) / (225 * Di));
+            }
+            const SPP = 150 + P_pipe + P_ann_total;
+            document.getElementById('outSPP').innerText = SPP > 150 ? Math.round(SPP) : 0;
+            document.getElementById('outTqLim').innerText = Math.round(((MUtq * 0.8) / 1000) * Mesa);
+
+            let animBarsData = [];
+            if (direccion === 'Directa') {
+                tramosActivos.forEach(t => animBarsData.push({ label: `Tramo ${t.id}`, val: t.Va, type: 'fluid' }));
+            } else { animBarsData.push({ label: 'Tubería Int.', val: VaCritica, type: 'fluid' }); }
+            animBarsData.push({ label: 'Gravedad (Vs)', val: Vs, type: 'gravity' });
+
+            if (animEngine.canvas) animEngine.updateData(animBarsData, fluidType, Material);
+            
+            renderWellbore(tramosActivos, Do, slickline, objetivo);
+        }
+
+        window.onload = function() {
+            animEngine.init();
+            updateCasingID(1); updateCasingID(2); updateCasingID(3); updateCasingID(4);
+            updateFluidProperties(); 
+            calculate();
+        };
+    </script>
+</body>
+</html>
