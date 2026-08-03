@@ -1,0 +1,140 @@
+<!-- ... existing code ... -->
+        let bomTargetTop = 10500;
+        let bomTargetBottom = 10700;
+        let bomTargetStack = []; 
+        let bomTargetCapacity = 200; 
+
+        // === VARIABLES DAQ (ADQUISICIÓN) ===
+        let bomCurrentPres = 150;
+        let bomDaqData = [];
+        let bomSimTime = 0;
+        let bomDaqLastCap = 0;
+
+        function bomAddCasing() { if (bomCasingSections.length >= 4) return; let lastMD = bomCasingSections[bomCasingSections.length-1].md; bomCasingSections.push({ id: Date.now(), type: "oh_6.0", top: lastMD - 200, md: lastMD + 1000 }); bomBuildWell(); }
+<!-- ... existing code ... -->
+        function cerrarDashboard() {
+            document.getElementById('dashboardView').classList.add('hidden'); document.getElementById('dashboardView').classList.remove('flex');
+            if (moduloGlobalSeleccionado === 'molienda') {
+                document.getElementById('moliendaAppWrapper').classList.remove('hidden');
+                setTimeout(() => { if (animEngine && animEngine.canvas) animEngine.resize(); }, 50);
+                document.getElementById('uiHeaderMoliendaPozo').innerText = currentProjectName;
+                document.getElementById('uiHeaderClienteMol').innerText = currentProjectCliente || '--';
+                document.getElementById('uiHeaderODTMol').innerText = currentProjectODT || '--';
+                calculateMolienda();
+            } else if (moduloGlobalSeleccionado === 'bombeo') {
+                document.getElementById('bombeoAppWrapper').classList.remove('hidden');
+                setTimeout(() => { bomEngine.resize(); bomDaqEngine.resize(); }, 50);
+                document.getElementById('uiHeaderBombeoPozo').innerText = currentProjectName;
+                document.getElementById('uiHeaderClienteBomb').innerText = currentProjectCliente || '--';
+                bomBuildWell();
+            }
+        }
+<!-- ... existing code ... -->
+        function bomReset() {
+            bomIsPlaying = false; bomVolPumped = 0; bomInjectedVol = 0; bomCurrentStageIdx = 0; if (bomFluidStages.length === 0) bomCurrentStageIdx = -1;
+            document.getElementById('btnBomPlay').innerHTML = "▶ INICIAR BOMBA"; document.getElementById('btnBomPlay').className = "bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-lg shadow-[0_0_15px_rgba(16,185,129,0.3)] transition tracking-wider";
+            bomStackTubing = [{ color: bomDefaultMudColor, vol: bomSys.tubVol }]; 
+            bomStackAnnulus = [{ color: bomDefaultMudColor, vol: bomSys.annVol }];
+            bomTargetStack = []; 
+            bomSetEvent('normal');
+            bomFluidStages.forEach(s => s.pumped = 0);
+            
+            currentVTop = 0;
+            currentVBottom = Math.max(1000, bomSys.maxMD);
+
+            // Reiniciar DAQ
+            bomDaqData = [];
+            bomSimTime = 0;
+            bomDaqLastCap = 0;
+
+            bomUpdateControls(); bomDraw();
+            if(bomDaqEngine) bomDaqEngine.draw();
+        }
+
+        document.getElementById('bomSliderQ').addEventListener('input', function(e) { document.getElementById('bomSensorQ').value = e.target.value; bomQ = parseFloat(e.target.value); bomUpdateControls(); });
+<!-- ... existing code ... -->
+                }
+            }
+            
+            // --- GRABACIÓN DE DAQ EN TIEMPO REAL ---
+            bomSimTime += dt;
+            if (bomSimTime - bomDaqLastCap > 300) { // Toma una muestra cada 0.3 segundos de simulador
+                let stgVol = 0;
+                if (bomCurrentStageIdx >= 0 && bomCurrentStageIdx < bomFluidStages.length) stgVol = bomFluidStages[bomCurrentStageIdx].pumped || 0;
+                
+                bomDaqData.push({ t: bomSimTime, q: bomQ, p: bomCurrentPres, vt: bomVolPumped, ve: stgVol });
+                
+                if (bomDaqData.length > 300) bomDaqData.shift(); // Mantener solo ventana reciente (Scrolling)
+                bomDaqLastCap = bomSimTime;
+                if(bomDaqEngine) bomDaqEngine.draw();
+            }
+
+            bomUpdateControls(); bomDraw();
+            requestAnimationFrame(bomLoop);
+        }
+
+        const bomEngine = {
+            canvas: null, ctx: null, width: 0, height: 0,
+            init() { this.canvas = document.getElementById('bomCanvas'); this.ctx = this.canvas.getContext('2d'); this.resize(); window.addEventListener('resize', () => { if(moduloGlobalSeleccionado==='bombeo') this.resize() }); },
+            resize() { if(!this.canvas || !this.canvas.parentElement) return; const rect = this.canvas.parentElement.getBoundingClientRect(); const dpr = window.devicePixelRatio || 1; this.canvas.width = rect.width * dpr; this.canvas.height = rect.height * dpr; this.ctx.scale(dpr, dpr); this.width = rect.width; this.height = rect.height; bomDraw(); }
+        };
+
+        const bomDaqEngine = {
+            canvas: null, ctx: null, width: 0, height: 0,
+            init() { this.canvas = document.getElementById('bomDaqCanvas'); this.ctx = this.canvas.getContext('2d'); this.resize(); window.addEventListener('resize', () => { if(moduloGlobalSeleccionado==='bombeo') this.resize() }); },
+            resize() { if(!this.canvas || !this.canvas.parentElement) return; const rect = this.canvas.parentElement.getBoundingClientRect(); const dpr = window.devicePixelRatio || 1; this.canvas.width = rect.width * dpr; this.canvas.height = rect.height * dpr; this.ctx.scale(dpr, dpr); this.width = rect.width; this.height = rect.height; this.draw(); },
+            draw() {
+                if(!this.ctx) return;
+                const ctx = this.ctx; const W = this.width; const H = this.height;
+                ctx.clearRect(0, 0, W, H);
+                
+                // Malla Base
+                ctx.strokeStyle = '#1e293b'; ctx.lineWidth = 1;
+                ctx.beginPath();
+                for(let i=1; i<5; i++) { let y = (H/5)*i; ctx.moveTo(0, y); ctx.lineTo(W, y); }
+                for(let i=1; i<10; i++) { let x = (W/10)*i; ctx.moveTo(x, 0); ctx.lineTo(x, H); }
+                ctx.stroke();
+
+                if (bomDaqData.length < 2) return;
+
+                const drawLine = (key, color, maxVal) => {
+                    ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = 2;
+                    let stepX = W / 300; 
+                    for(let i=0; i<bomDaqData.length; i++) {
+                        let x = W - ((bomDaqData.length - 1 - i) * stepX);
+                        let y = H - (Math.min(bomDaqData[i][key], maxVal) / maxVal) * (H - 10);
+                        if(i===0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                    }
+                    ctx.stroke();
+                };
+
+                let maxVol = (bomSys.tubVol + bomSys.annVol) * 1.5 || 500;
+                drawLine('q', '#f43f5e', 600);   // GPM
+                drawLine('p', '#e11d48', 6000);  // Presión
+                drawLine('vt', '#38bdf8', maxVol); // Vol Total
+                drawLine('ve', '#fbbf24', 200);  // Vol Etapa
+            }
+        };
+
+        function bomUpdateControls() {
+<!-- ... existing code ... -->
+                lblPres.innerText = "Presión Superficie";
+                document.getElementById('bomStatusBadge').innerText = (!bomAnnulusOpen && bomQ > 0) ? "INYECCIÓN A FORMACIÓN" : (bomQ > 0 ? "BOMBEANDO FLUIDO" : "BOMBAS DETENIDAS");
+                document.getElementById('bomStatusBadge').className = (!bomAnnulusOpen && bomQ > 0) ? "text-[0.65rem] font-bold px-2 py-1 rounded bg-indigo-600 text-white border border-indigo-500" : (bomQ > 0 ? "text-[0.65rem] font-bold px-2 py-1 rounded bg-emerald-600 text-white border border-emerald-500" : "text-[0.65rem] font-bold px-2 py-1 rounded bg-slate-600 text-white border border-slate-500");
+            }
+            if (bomQ === 0 && bomCurrentEvent !== 'tapado') pres = bomBasePressure;
+            bomCurrentPres = pres; // Guardar valor para el DAQ
+            document.getElementById('bomOutPres').innerText = Math.round(pres);
+
+            // LOGICA TRACKER INTELIGENTE
+<!-- ... existing code ... -->
+        window.onload = function() {
+            document.getElementById('loginView').classList.remove('hidden');
+            document.getElementById('loginView').classList.add('flex');
+            
+            animEngine.init();
+            bomEngine.init();
+            bomDaqEngine.init(); // Iniciar Gráfico DAQ
+            
+            inicializarInventarios(); 
+<!-- ... existing code ... -->
