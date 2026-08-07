@@ -1,0 +1,1685 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Suite Operativa - Simulador de Bombeo Avanzado</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #0B1120; color: #e2e8f0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow-x: hidden; }
+        .glass-panel { background: rgba(15, 23, 42, 0.8); border: 1px solid #1e293b; border-radius: 0.75rem; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2); }
+        .input-field { background-color: #0f172a; border: 1px solid #334155; color: #06b6d4; font-weight: bold; padding: 0.4rem; border-radius: 0.375rem; width: 100%; transition: all 0.3s; font-size: 0.875rem; }
+        .input-field:focus { outline: none; border-color: #06b6d4; box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.2); }
+        .input-field:disabled { color: #64748b; background-color: #0B1120; cursor: not-allowed; border-color: #1e293b; }
+        .label-text { font-size: 0.7rem; color: #64748b; margin-bottom: 0.15rem; display: block; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+        .highlight-value { font-size: 1.5rem; font-weight: 800; line-height: 1.2; }
+        .section-title { font-size: 1rem; font-weight: 700; color: #f8fafc; margin-bottom: 0.75rem; padding-bottom: 0.5rem; border-bottom: 1px solid #1e293b; display: flex; align-items: center; gap: 0.5rem; }
+        
+        @media print {
+            body { background-color: #ffffff !important; color: #000000 !important; }
+            .glass-panel { background: #ffffff !important; border: 1px solid #ccc !important; box-shadow: none !important; break-inside: avoid; color: #000 !important; }
+            .print-hidden { display: none !important; }
+            .print-full-width { grid-column: span 12 / span 12 !important; width: 100% !important; }
+            .text-white, .text-slate-200, .text-slate-300, .text-slate-400, .text-cyan-400, .text-pink-400, .text-emerald-400 { color: #111827 !important; }
+            canvas { max-height: 250px !important; border: 1px solid #ddd; }
+            #bomDaqCanvas { filter: invert(1) hue-rotate(180deg); border: none; }
+        }
+        
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #0B1120; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+
+        select option { background-color: #0f172a; color: #e2e8f0; }
+
+        .toggle-checkbox:checked { right: 0; border-color: #ef4444; }
+        .toggle-checkbox:checked + .toggle-label { background-color: #ef4444; }
+        .toggle-checkbox:checked + .toggle-label:after { transform: translateX(100%); border-color: white; }
+    </style>
+</head>
+<body class="min-h-screen text-sm relative">
+
+    <div id="customDialog" class="fixed inset-0 bg-black/80 z-[200] hidden flex-col items-center justify-center p-4 transition-opacity print-hidden">
+        <div class="bg-[#0f172a] p-6 rounded-xl border border-slate-700 w-full max-w-sm shadow-2xl text-center">
+            <h3 id="dialogTitle" class="text-xl font-bold text-white mb-2">Alerta</h3>
+            <p id="dialogMsg" class="text-slate-300 text-sm mb-6">Mensaje</p>
+            <div class="flex justify-center gap-3">
+                <button id="btnDialogCancel" class="px-4 py-2 rounded border border-slate-600 text-slate-300 hover:bg-slate-800 transition font-bold text-sm hidden">Cancelar</button>
+                <button id="btnDialogOk" class="px-4 py-2 rounded bg-pink-600 hover:bg-pink-500 text-white transition font-bold text-sm shadow">Aceptar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PANTALLA 1: LOGIN -->
+    <div id="loginView" class="fixed inset-0 bg-[#0B1120] z-[100] flex flex-col items-center justify-center p-6 transition-opacity duration-300 print-hidden">
+        <div class="text-center mb-8">
+            <div class="inline-flex items-center justify-center w-16 h-16 rounded-full border-2 border-pink-500 mb-4 shadow-[0_0_15px_rgba(236,72,153,0.3)] bg-[#0f172a]">
+                <svg class="w-8 h-8 text-pink-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+            </div>
+            <h1 class="text-2xl md:text-3xl font-black text-pink-400 tracking-widest uppercase mb-1 drop-shadow-md">Simulador de Bombeo</h1>
+            <p class="text-slate-400 text-[0.65rem] md:text-xs tracking-[0.2em] uppercase mb-4">Plataforma Operativa</p>
+            <span class="border border-slate-700 text-slate-500 bg-[#0f172a] text-[0.65rem] px-3 py-1 rounded">V18.5 - FINAL</span>
+        </div>
+
+        <div class="bg-[#0f172a] border border-slate-800 p-8 rounded-xl max-w-md w-full shadow-2xl relative overflow-hidden">
+            <div class="absolute -top-20 -right-20 w-40 h-40 bg-pink-900/20 blur-3xl rounded-full pointer-events-none"></div>
+            <h2 class="text-center text-white font-bold mb-6 text-lg tracking-wide">Acceso de Operador</h2>
+            
+            <div class="space-y-5 relative z-10">
+                <div>
+                    <label class="text-[0.65rem] text-slate-400 uppercase tracking-wider mb-1 block">Nombre Completo</label>
+                    <input type="text" id="inpLoginNombre" class="w-full bg-[#0B1120] border border-slate-800 text-slate-200 text-sm py-3 px-4 rounded focus:outline-none focus:border-pink-500 transition-colors" placeholder="Ingrese su nombre...">
+                </div>
+                <div>
+                    <label class="text-[0.65rem] text-slate-400 uppercase tracking-wider mb-1 block">Cargo</label>
+                    <div class="relative">
+                        <select id="inpLoginCargo" class="w-full bg-[#0B1120] border border-slate-800 text-slate-200 text-sm py-3 px-4 pr-10 rounded focus:outline-none focus:border-pink-500 transition-colors cursor-pointer appearance-none">
+                            <option value="" disabled selected hidden>Seleccionar cargo...</option>
+                            <option value="Operador de Campo">Operador de Campo</option>
+                            <option value="Operador Senior">Operador Senior</option>
+                            <option value="Técnico de Fluidos">Técnico de Fluidos</option>
+                            <option value="Técnico de Perforación">Técnico de Perforación</option>
+                            <option value="Supervisor de Campo">Supervisor de Campo</option>
+                            <option value="Ingeniero de Operaciones">Ingeniero de Operaciones</option>
+                        </select>
+                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-400">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <button onclick="procesarLogin()" class="relative z-10 w-full bg-[#ec4899] hover:bg-pink-400 text-white font-bold tracking-widest py-3.5 px-4 rounded transition-colors mt-8 shadow-[0_0_20px_rgba(236,72,153,0.3)] uppercase text-sm">
+                INGRESAR AL SISTEMA
+            </button>
+        </div>
+    </div>
+
+    <!-- PANTALLA GESTOR DE PROYECTOS Y DASHBOARD -->
+    <div id="dashboardView" class="fixed inset-0 bg-[#0B1120] z-[80] hidden flex-col items-center justify-center p-6 transition-opacity duration-300 print-hidden">
+        <div class="absolute top-4 right-6 flex items-center gap-3 bg-slate-800/80 px-4 py-2 rounded-full border border-slate-700 shadow-md">
+            <div class="w-8 h-8 rounded-full bg-pink-600 flex items-center justify-center text-white font-bold text-sm" id="userInitial">U</div>
+            <div class="flex flex-col">
+                <span class="text-sm font-bold text-white leading-tight" id="dashboardUserName">Usuario</span>
+                <span class="text-[0.65rem] text-pink-400 font-bold uppercase leading-tight" id="dashboardUserRole">Cargo</span>
+            </div>
+            <button onclick="cerrarSesion()" class="ml-2 text-slate-400 hover:text-pink-400 transition" title="Cerrar Sesión">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+            </button>
+        </div>
+
+        <div class="max-w-4xl w-full flex flex-col items-center justify-center mt-12">
+            <h1 class="text-3xl font-black text-white mb-2 text-center uppercase tracking-tight flex items-center justify-center gap-3">
+                <svg class="w-10 h-10 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+                Gestor de Bombeo
+            </h1>
+            <p class="text-slate-400 text-center mb-8">Seleccione un proyecto para simular o analice un historial exportado</p>
+
+            <div class="flex flex-col sm:flex-row gap-4 mb-8 justify-center w-full">
+                <button onclick="crearNuevoPozo()" class="bg-pink-600 hover:bg-pink-500 text-white px-6 py-3 rounded-lg font-bold shadow-[0_0_15px_rgba(236,72,153,0.3)] transition flex items-center justify-center gap-2 uppercase tracking-wider text-sm w-full sm:w-auto">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg> Nuevo Pozo
+                </button>
+                <button onclick="abrirVisorCSV()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-3 rounded-lg font-bold shadow transition flex items-center justify-center gap-2 uppercase tracking-wider text-sm w-full sm:w-auto">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg> Analizar CSV Histórico
+                </button>
+            </div>
+
+            <div class="glass-panel p-5 shadow-lg border-t-4 border-t-pink-500 w-full">
+                <h2 class="text-lg font-bold text-white mb-4 border-b border-slate-700 pb-2">Mis Pozos</h2>
+                <div id="listaProyectos" class="space-y-3 max-h-[400px] overflow-y-auto pr-2"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL NUEVO POZO -->
+    <div id="modalNuevoPozo" class="fixed inset-0 bg-black/80 z-[110] hidden flex-col items-center justify-center p-4 transition-opacity print-hidden">
+        <div class="bg-slate-800 p-6 rounded-xl border border-slate-700 w-full max-w-md shadow-2xl">
+            <h3 class="text-xl font-bold text-white mb-4 flex items-center gap-2">Crear Nuevo Pozo</h3>
+            <div class="space-y-4">
+                <div><label class="label-text text-pink-400">Nombre del Pozo</label><input type="text" id="inpNewPozoNombre" class="input-field" placeholder="Ej: SCHS-264"></div>
+                <div><label class="label-text text-pink-400">Cliente</label><input type="text" id="inpNewPozoCliente" class="input-field" placeholder="Ej: Petroamazonas"></div>
+                <div><label class="label-text text-pink-400">ODT / Número de Trabajo</label><input type="text" id="inpNewPozoODT" class="input-field" placeholder="Ej: ODT-2023-045"></div>
+            </div>
+            <div class="flex justify-end gap-3 mt-6">
+                <button onclick="cerrarModalNuevoPozo()" class="px-4 py-2 rounded text-slate-300 hover:bg-slate-700 transition font-bold text-sm">Cancelar</button>
+                <button onclick="confirmarNuevoPozo()" class="px-4 py-2 rounded bg-pink-600 hover:bg-pink-500 text-white transition font-bold text-sm shadow">Crear Pozo</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PANTALLA ANÁLISIS CSV -->
+    <div id="csvAnalysisView" class="fixed inset-0 bg-[#0B1120] z-[85] hidden flex-col p-6 transition-opacity duration-300 print-hidden">
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-2xl font-black text-white flex items-center gap-2">
+                <svg class="w-8 h-8 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                Post-Análisis de Operación
+            </h2>
+            <button onclick="cerrarVisorCSV()" class="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded font-bold transition text-sm">Volver al Inicio</button>
+        </div>
+        
+        <div class="bg-[#0f172a] border border-slate-700 p-6 rounded-xl flex flex-col items-center justify-center h-40 mb-6 border-dashed" id="csvDropZone">
+            <input type="file" id="csvFileInput" accept=".csv" class="hidden" onchange="procesarArchivoCSV(event)">
+            <label for="csvFileInput" class="cursor-pointer bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-3 rounded-lg font-bold shadow transition mb-2">Seleccionar archivo CSV</label>
+            <p class="text-sm text-slate-400">Sube el historial exportado para visualizar la gráfica.</p>
+        </div>
+
+        <div id="csvResultsPanel" class="hidden flex-col gap-6 flex-grow">
+            <div class="grid grid-cols-3 gap-4">
+                <div class="bg-slate-800 border border-slate-700 p-4 rounded-lg text-center"><p class="text-xs text-slate-400 uppercase font-bold">Caudal Máximo</p><p class="text-2xl font-black text-pink-400" id="csvMaxQ">0 GPM</p></div>
+                <div class="bg-slate-800 border border-slate-700 p-4 rounded-lg text-center"><p class="text-xs text-slate-400 uppercase font-bold">Presión Máxima</p><p class="text-2xl font-black text-cyan-400" id="csvMaxP">0 PSI</p></div>
+                <div class="bg-slate-800 border border-slate-700 p-4 rounded-lg text-center"><p class="text-xs text-slate-400 uppercase font-bold">Volumen Total Bombeado</p><p class="text-2xl font-black text-emerald-400" id="csvTotalV">0 bbl</p></div>
+            </div>
+            <div class="bg-[#0f172a] border border-slate-700 rounded-lg p-4 flex-grow relative min-h-[300px]">
+                <canvas id="csvChartCanvas" class="w-full h-full"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==========================================
+         MÓDULO: SIMULADOR DE BOMBEO 3D AVANZADO
+    =========================================== -->
+    <div id="bombeoAppWrapper" class="w-full mx-auto hidden transition-opacity duration-300 pt-6 px-4 md:px-8 xl:px-12 2xl:px-16 print-full-width flex-col min-h-screen">
+        
+        <!-- ENCABEZADO -->
+        <header class="mb-6 flex flex-col md:flex-row items-start md:items-center justify-between border-b border-slate-800 pb-4 print-hidden shrink-0">
+            <div>
+                <h1 class="text-xl md:text-2xl lg:text-3xl font-black text-white tracking-tight flex items-center gap-3 uppercase">
+                    <svg class="w-8 h-8 text-pink-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+                    SIM. BOMBEO <span class="text-pink-600 ml-2">- <span id="uiHeaderBombeoPozo"></span></span>
+                </h1>
+                <div class="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-sm font-medium">
+                    <p class="text-indigo-300"><span class="text-slate-400 text-xs uppercase">Cliente:</span> <span id="uiHeaderClienteBomb" class="font-bold">--</span></p>
+                    <p class="text-indigo-300 hidden md:block">|</p>
+                    <p class="text-indigo-300"><span class="text-slate-400 text-xs uppercase">ODT:</span> <span id="uiHeaderODTBomb" class="font-bold text-orange-400">--</span></p>
+                </div>
+            </div>
+            
+            <div class="mt-4 md:mt-0 flex flex-wrap gap-3">
+                <button onclick="volverAlDashboard()" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white py-2 px-4 rounded-lg text-xs font-bold transition shadow">Cerrar Pozo / Guardar</button>
+                <button onclick="exportarCSV()" class="bg-indigo-600 hover:bg-indigo-500 text-white py-2 px-3 rounded-lg text-xs font-bold transition flex items-center gap-2 shadow">💾 Exportar Historial (CSV)</button>
+                <button onclick="window.print()" class="bg-teal-600 hover:bg-teal-500 text-white py-2 px-3 rounded-lg text-xs font-bold transition flex items-center gap-2 shadow">🖨️ Generar Reporte PDF</button>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-grow pb-12">
+            
+            <!-- PANEL IZQUIERDO: DISEÑO DE POZO -->
+            <div class="lg:col-span-4 xl:col-span-3 space-y-4 flex flex-col print-hidden">
+                
+                <!-- CONDICIÓN INICIAL (LLENADO / ECHOMETER) -->
+                <div class="glass-panel p-4 border-l-4 border-l-teal-500 flex flex-col shadow-lg transition-all duration-300">
+                    <h2 class="font-bold text-teal-400 text-base mb-3 border-b border-slate-700 pb-2">Condición Inicial (Pozo)</h2>
+                    <label class="flex items-center gap-2 text-sm text-white font-bold cursor-pointer mb-3 p-2 bg-slate-800 rounded border border-slate-600 hover:bg-slate-700">
+                        <input type="checkbox" id="bomChkFull" checked onchange="bomToggleFluidLevel()" class="w-4 h-4 accent-teal-500"> Pozo Lleno a Superficie
+                    </label>
+                    <div id="bomFluidLevelDiv" class="hidden flex-col gap-2 bg-[#0B1120] p-3 rounded border border-rose-900/50 transition-all">
+                        <label class="text-[0.65rem] text-slate-400 font-bold uppercase tracking-wider">Prof. del Fluido / Eco (ft de vacío)</label>
+                        <div class="flex items-center gap-2">
+                            <input type="number" id="bomInpFluidLevel" value="1000" class="input-field w-full text-center py-1.5" onchange="bomBuildWell()">
+                            <span class="text-xs font-bold text-slate-500">ft</span>
+                        </div>
+                        <p class="text-[0.65rem] text-slate-400 uppercase mt-2">Vol. necesario para llenar: <span id="bomVolToFill" class="font-black text-rose-400 text-sm block">0 bbl</span></p>
+                    </div>
+                </div>
+
+                <!-- REVESTIDORES -->
+                <div class="glass-panel p-4 border-l-4 border-l-indigo-500 flex flex-col shadow-lg">
+                    <div class="flex items-center justify-between mb-3 border-b border-slate-700 pb-2">
+                        <h2 class="font-bold text-indigo-400 text-base">Revestidores (Casing/OH)</h2>
+                        <button onclick="bomAddCasing()" class="bg-indigo-600 hover:bg-indigo-500 transition px-2 py-1 rounded text-xs text-white font-bold shadow">+ Agregar</button>
+                    </div>
+                    <div class="grid grid-cols-12 gap-1 mb-1 text-[0.6rem] text-slate-500 font-bold uppercase tracking-wider text-center">
+                        <div class="col-span-1"></div><div class="col-span-5 text-left">Tipo</div><div class="col-span-3">Tope(ft)</div><div class="col-span-3">Base(ft)</div>
+                    </div>
+                    <div id="bomCasingList" class="space-y-2 max-h-[150px] overflow-y-auto pr-1"></div>
+                </div>
+
+                <!-- TUBERÍA INTERNA -->
+                <div class="glass-panel p-4 border-l-4 border-l-emerald-500 flex flex-col shadow-lg">
+                    <div class="flex items-center justify-between mb-3 border-b border-slate-700 pb-2">
+                        <h2 class="font-bold text-emerald-400 text-base">Tubería Interna (Sarta)</h2>
+                        <button onclick="bomAddTubing()" class="bg-emerald-600 hover:bg-emerald-500 transition px-2 py-1 rounded text-xs text-white font-bold shadow">+ Agregar</button>
+                    </div>
+                    <div class="grid grid-cols-12 gap-1 mb-1 text-[0.6rem] text-slate-500 font-bold uppercase tracking-wider text-center">
+                        <div class="col-span-1"></div><div class="col-span-8 text-left">Tipo</div><div class="col-span-3">Base(ft)</div>
+                    </div>
+                    <div id="bomTubingList" class="space-y-2 max-h-[150px] overflow-y-auto pr-1"></div>
+                    
+                    <div class="mt-3 pt-3 border-t border-slate-700 flex items-center justify-between bg-[#0B1120] p-2 rounded">
+                        <label class="text-[0.65rem] text-slate-400 font-bold uppercase tracking-wider">PBTD General (ft)</label>
+                        <input type="number" id="bomInpPBTD" class="input-field w-24 text-center py-1 bg-slate-900 border-slate-600" value="15000" onchange="bomBuildWell()">
+                    </div>
+                </div>
+
+                <!-- CONDICIÓN DE FONDO (TAPÓN/TOF) -->
+                <div class="glass-panel p-4 border-l-4 border-l-sky-500 flex flex-col shadow-lg">
+                    <h2 class="font-bold text-sky-400 text-base mb-3 border-b border-slate-700 pb-2">Condición de Fondo</h2>
+                    
+                    <div class="mb-3">
+                        <label class="text-[0.65rem] text-slate-400 font-bold uppercase tracking-wider block mb-1">Tipo de Fondo</label>
+                        <select id="bomInpBottomType" class="input-field text-sm py-2 bg-slate-900/60" onchange="bomUpdateControls()">
+                            <option value="formacion" selected>Formación (Permeable / Punzados)</option>
+                            <option value="tapon">Tapón / TOF (Sólido o Semisólido)</option>
+                        </select>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3 mb-3">
+                        <div>
+                            <label class="text-[0.65rem] text-slate-400 font-bold uppercase tracking-wider block mb-1">Tope (ft)</label>
+                            <input type="number" id="bomInpTargetTop" class="input-field text-center py-1.5" value="10500" onchange="bomBuildWell()">
+                        </div>
+                        <div>
+                            <label class="text-[0.65rem] text-slate-400 font-bold uppercase tracking-wider block mb-1">Fondo (ft)</label>
+                            <input type="number" id="bomInpTargetBottom" class="input-field text-center py-1.5" value="10700" onchange="bomBuildWell()">
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="text-[0.65rem] text-slate-400 font-bold uppercase tracking-wider block mb-1" title="0 = Totalmente Tapado, 1 = Fuga Total">Factor de Filtración (0 a 1)</label>
+                        <input type="number" id="bomInpBottomLeak" class="input-field text-center py-1.5 bg-slate-900" value="1" min="0" max="1" step="0.1" onchange="bomUpdateControls()">
+                    </div>
+                </div>
+
+                <button onclick="bomBuildWell()" class="w-full bg-slate-700 hover:bg-sky-600 text-white py-3 rounded-lg font-bold shadow-[0_0_15px_rgba(14,165,233,0.2)] transition text-sm">Aplicar Diseño y Calcular Capacidades</button>
+
+                <!-- PROGRAMA DE BOMBEO (FLUIDOS) -->
+                <div class="glass-panel p-4 border-l-4 border-l-amber-500 flex flex-col shadow-lg flex-grow">
+                    <div class="flex items-center justify-between mb-3 border-b border-slate-700 pb-2">
+                        <h2 class="font-bold text-amber-400 text-base">Programa de Bombeo</h2>
+                        <button onclick="bomAddStage()" class="bg-amber-600 hover:bg-amber-500 transition px-2 py-1 rounded text-xs text-slate-900 font-bold shadow">+ Fluido</button>
+                    </div>
+                    <div class="bg-slate-800 text-[0.55rem] font-bold text-slate-400 grid grid-cols-12 gap-1 p-2 rounded-t tracking-wider uppercase items-center">
+                        <div class="col-span-1 text-center text-pink-400" title="Selección Activa para Bombear">SEL</div>
+                        <div class="col-span-3">Nombre</div>
+                        <div class="col-span-2 text-center" title="Densidad (ppg)">MW</div>
+                        <div class="col-span-2 text-center" title="Viscosidad Dinámica">Visc</div>
+                        <div class="col-span-2 text-center" title="Volumen (BBL)">Vol</div>
+                        <div class="col-span-1 text-center">Col</div>
+                        <div class="col-span-1 text-center">Del</div>
+                    </div>
+                    <div id="bomStageList" class="space-y-1 overflow-y-auto flex-grow max-h-[180px]"></div>
+                </div>
+            </div>
+
+            <!-- PANEL CENTRAL: CONSOLA DE BOMBEO -->
+            <div class="lg:col-span-4 xl:col-span-4 space-y-4 flex flex-col print-hidden">
+                <div class="glass-panel p-5 border-l-4 border-l-pink-500 flex flex-col shadow-lg bg-gradient-to-br from-slate-900 to-[#0B1120] relative">
+                    <h2 class="font-bold text-pink-400 text-lg mb-4 border-b border-slate-700 pb-2 flex justify-between items-center">
+                        <span>Consola de Control</span>
+                        <!-- BOTÓN USB DAQ -->
+                        <button id="btnConnectUSB" onclick="conectarHardwareUSB()" class="text-[0.6rem] bg-indigo-900 text-indigo-300 border border-indigo-500 px-3 py-1 rounded uppercase tracking-wider hover:bg-indigo-700 transition flex items-center gap-1 shadow">
+                            🔌 Conectar COM
+                        </button>
+                    </h2>
+                    
+                    <div class="grid grid-cols-2 gap-4 items-start mb-6">
+                        <div class="bg-[#0f172a] border border-slate-700 p-4 rounded-xl text-center shadow-inner relative flex flex-col items-center justify-center">
+                            <label class="text-[0.65rem] text-slate-400 font-bold uppercase tracking-wider block mb-2">Sensor Caudal (Q)</label>
+                            <input type="number" id="bomSensorQ" class="bg-transparent w-full text-center text-4xl font-black text-pink-400 focus:outline-none" value="0">
+                            <span class="text-xs text-slate-500 font-bold">GPM</span>
+                            <input type="range" id="bomSliderQ" min="0" max="600" value="0" class="w-full mt-4 cursor-pointer accent-pink-500">
+                        </div>
+
+                        <div class="bg-[#0f172a] border border-slate-700 p-4 rounded-xl shadow-inner flex flex-col justify-center items-center h-full gap-3">
+                            <label class="text-[0.65rem] text-slate-400 font-bold uppercase tracking-wider block text-center">Válvula BOP (Anular)</label>
+                            <div class="relative inline-block w-16 align-middle select-none transition duration-200 ease-in mt-2">
+                                <input type="checkbox" name="toggle" id="bomToggleBOP" class="toggle-checkbox absolute block w-7 h-7 rounded-full bg-white border-4 appearance-none cursor-pointer border-emerald-500" style="top: 2px; left: 2px; transition: all 0.3s;"/>
+                                <label for="bomToggleBOP" class="toggle-label block overflow-hidden h-8 rounded-full bg-emerald-500 cursor-pointer shadow-inner" style="transition: all 0.3s;"></label>
+                            </div>
+                            <span id="bomLblBOP" class="text-xs font-bold text-emerald-400 tracking-wide text-center">ABIERTA<br>(Retorno Normal)</span>
+                        </div>
+                    </div>
+
+                    <div class="bg-[#0f172a] border border-slate-700 p-3 rounded-lg mb-6 flex items-center justify-between shadow-inner">
+                        <label class="text-[0.65rem] text-slate-400 font-bold uppercase tracking-wider">Dirección Flujo</label>
+                        <select id="bomInpDir" class="bg-transparent text-emerald-400 font-bold text-sm focus:outline-none cursor-pointer" onchange="bomDirFlow = this.value; bomUpdateControls();">
+                            <option value="Directa" selected>DIRECTA (Baja Sarta / Sube Anular)</option>
+                            <option value="Inversa">INVERSA (Baja Anular / Sube Sarta)</option>
+                        </select>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3 mb-6">
+                        <button onclick="bomPlay()" id="btnBomPlay" class="bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-lg shadow-[0_0_15px_rgba(16,185,129,0.3)] transition tracking-wider">▶ INICIAR BOMBA</button>
+                        <button onclick="bomReset()" class="bg-slate-700 hover:bg-slate-600 text-white font-black py-3 rounded-lg shadow transition tracking-wider">⟲ REINICIAR POZO</button>
+                    </div>
+
+                    <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-700 pb-1 mb-3">Eventos de Pozo (Simulación Fallas)</h3>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button onclick="bomSetEvent('normal')" id="btnEvtNormal" class="bg-cyan-900 border border-cyan-500 text-white shadow-[0_0_10px_rgba(6,182,212,0.4)] scale-105 py-2 rounded text-[0.65rem] font-bold uppercase transition">Normal</button>
+                        <button onclick="bomSetEvent('tapado')" id="btnEvtTapado" class="bg-slate-800 border border-slate-600 text-rose-500 hover:bg-rose-900/30 py-2 rounded text-[0.65rem] font-bold uppercase transition">Obstrucción</button>
+                        <button onclick="bomSetEvent('admision')" id="btnEvtAdmision" class="bg-slate-800 border border-slate-600 text-amber-500 hover:bg-amber-900/30 py-2 rounded text-[0.65rem] font-bold uppercase transition">Admisión</button>
+                    </div>
+                </div>
+
+                <!-- CAPACIDADES CARD (Debajo de consola) -->
+                <div id="bomCapacitiesCard" class="glass-panel p-3 text-center grid grid-cols-3 gap-2 border-t-2 border-t-sky-500 flex-grow content-end">
+                    <div><span class="block text-[0.55rem] text-slate-400 uppercase tracking-widest">Sarta Int.</span><span id="bomCapTubing" class="font-bold text-sky-400 text-sm">0 bbl</span></div>
+                    <div class="border-x border-slate-700"><span class="block text-[0.55rem] text-slate-400 uppercase tracking-widest">Anular</span><span id="bomCapAnnulus" class="font-bold text-emerald-400 text-sm">0 bbl</span></div>
+                    <div><span class="block text-[0.55rem] text-slate-400 uppercase tracking-widest">Total Pozo</span><span id="bomCapTotal" class="font-bold text-white text-sm">0 bbl</span></div>
+                </div>
+            </div>
+
+            <!-- PANEL DERECHO: VISUALIZACIÓN GRÁFICA -->
+            <div class="lg:col-span-4 xl:col-span-5 flex flex-col space-y-4 print-full-width">
+                <!-- OUTPUTS SUPERIORES -->
+                <div class="grid grid-cols-3 gap-3 print-hidden shrink-0">
+                    <div class="glass-panel p-3 text-center border-t-2 border-t-sky-500 flex flex-col justify-center shadow-lg">
+                        <span class="label-text text-sky-400">Vol. Bombeado Total</span>
+                        <div class="highlight-value text-white"><span id="bomOutVol">0.0</span> <span class="text-[0.65rem] text-slate-400 font-normal tracking-wide">bbl</span></div>
+                    </div>
+                    <div id="bomPresContainer" class="glass-panel p-3 text-center border-t-2 border-t-rose-500 flex flex-col justify-center shadow-lg transition-colors duration-300">
+                        <span class="label-text text-rose-400" id="bomLblPres">Presión Superficie</span>
+                        <div class="highlight-value text-rose-300"><span id="bomOutPres">0</span> <span class="text-[0.65rem] text-slate-400 font-normal tracking-wide">psi</span></div>
+                    </div>
+                    <div class="glass-panel p-3 text-center border-t-2 border-t-emerald-500 flex flex-col justify-center shadow-lg">
+                        <span class="label-text text-emerald-400">Vol. Inyectado Form.</span>
+                        <div class="highlight-value text-emerald-300"><span id="bomOutInj">0.0</span> <span class="text-[0.65rem] text-slate-400 font-normal tracking-wide">bbl</span></div>
+                    </div>
+                </div>
+
+                <!-- CONTENEDOR 3D Y DAQ -->
+                <div class="glass-panel p-4 shadow-lg flex-grow flex flex-col border border-slate-700 relative overflow-hidden min-h-[500px]">
+                    <div class="flex justify-between items-center mb-2 border-b border-slate-700 pb-2 z-10 relative print-hidden shrink-0">
+                        <h3 class="section-title text-sm m-0 border-0 pb-0 text-pink-400">Monitor de Rastreo 3D</h3>
+                        <div class="flex gap-2 items-center">
+                            <label class="text-[0.6rem] font-bold text-slate-400 cursor-pointer flex items-center gap-1 bg-slate-800 px-2 py-1 rounded hover:bg-slate-700 transition border border-slate-600">
+                                <input type="checkbox" id="bomChkAutoTrack" checked onchange="bomAutoTrack = this.checked;" class="accent-sky-500"> 🔍 Auto-Track
+                            </label>
+                            <span id="bomStatusBadge" class="text-[0.65rem] font-bold px-2 py-1 rounded bg-slate-600 text-white border border-slate-500">BOMBAS DETENIDAS</span>
+                        </div>
+                    </div>
+
+                    <div class="w-full flex flex-col gap-4 flex-grow relative">
+                        <!-- Gráfico 1: Esquema de Pozo 3D -->
+                        <div class="w-full relative bg-[#050B14] rounded shadow-inner flex justify-center items-center overflow-hidden border border-slate-800" style="flex: 2 1 0%;">
+                            <div class="absolute inset-0 opacity-10 pointer-events-none" style="background-image: linear-gradient(#38bdf8 1px, transparent 1px), linear-gradient(90deg, #38bdf8 1px, transparent 1px); background-size: 20px 20px;"></div>
+                            <canvas id="bomCanvas" class="absolute top-0 left-0 w-full h-full"></canvas>
+                            
+                            <!-- Radar Log (HUD) -->
+                            <div class="absolute right-3 top-3 bg-[#0f172a]/90 backdrop-blur-md p-3 rounded-lg border border-slate-600 shadow-[0_4px_15px_rgba(0,0,0,0.5)] pointer-events-none min-w-[150px] print-hidden">
+                                <p class="text-[0.65rem] text-slate-400 font-bold uppercase tracking-widest border-b border-slate-700 pb-1 mb-1 flex items-center justify-between">
+                                    <span>Rastreador (SEL)</span>
+                                    <span class="w-2 h-2 rounded-full bg-pink-500 animate-pulse"></span>
+                                </p>
+                                <p class="text-xs font-semibold text-slate-200 mb-1 truncate" id="bomOutFluidName">Lodo Base</p>
+                                <div class="flex justify-between items-end mb-1">
+                                    <span class="text-[0.65rem] text-slate-400">MD Punta:</span>
+                                    <span id="bomOutMD" class="text-lg font-black text-pink-400 block leading-none">0 ft</span>
+                                </div>
+                                <div class="flex justify-between items-end border-t border-slate-700 pt-1 mt-1">
+                                    <span class="text-[0.6rem] text-slate-500" id="bomLblVolPunta">Vol a Punta:</span>
+                                    <span id="bomOutVolToTip" class="text-xs font-bold text-sky-400 block leading-none">0.0 bbl</span>
+                                </div>
+                                <div class="flex justify-between items-end mt-1">
+                                    <span class="text-[0.6rem] text-slate-500" id="bomLblVolSup">Vol a Superficie:</span>
+                                    <span id="bomOutVolToSurf" class="text-xs font-bold text-emerald-400 block leading-none">0.0 bbl</span>
+                                </div>
+                            </div>
+
+                            <div id="bomWarningOverlay" class="absolute inset-0 bg-rose-900/20 hidden flex-col items-center justify-center pointer-events-none transition-opacity">
+                                <span class="bg-rose-600 text-white font-black px-4 py-2 rounded shadow-lg animate-pulse uppercase tracking-widest border-2 border-white/20">Falla Mecánica Detectada</span>
+                            </div>
+                        </div>
+
+                        <!-- Gráfico 2: Carta DAQ en vivo -->
+                        <div class="w-full relative bg-[#050B14] rounded shadow-inner overflow-hidden border border-slate-800 flex flex-col" style="flex: 1 1 0%;">
+                            <div class="flex justify-between items-center px-3 py-1 bg-[#0B1120] border-b border-slate-800 print-hidden z-10 relative">
+                                <span class="text-[0.6rem] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                    <div class="w-1.5 h-1.5 bg-rose-500 rounded-full animate-pulse"></div> Adquisición DAQ
+                                </span>
+                                <div class="flex gap-3 text-[0.6rem] font-bold">
+                                    <span class="text-cyan-400">■ Presión</span>
+                                    <span class="text-pink-500">■ Caudal</span>
+                                    <span class="text-emerald-400">■ Vol Total</span>
+                                    <span class="text-amber-400">■ Vol Etapa</span>
+                                </div>
+                            </div>
+                            <div class="flex-grow relative">
+                                <canvas id="bomDaqCanvas" class="absolute top-0 left-0 w-full h-full"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let usuarioActual = { nombre: '', cargo: '', tipo: 'Operador' };
+        
+        let currentProjectId = null; 
+        let currentProjectName = "Nuevo Pozo"; 
+        let currentProjectCliente = ""; 
+        let currentProjectODT = ""; 
+
+        const casingDB = {
+            "13.375_68.0": { id: 12.415, label: 'Csg 13-3/8" - 68.0 lb' }, "9.625_47.0": { id: 8.681, label: 'Csg 9-5/8" - 47.0 lb' }, "7.0_29.0": { id: 6.184, label: 'Liner 7" - 29.0 lb' }, "5.5_17.0": { id: 4.892, label: 'Liner 5-1/2" - 17.0 lb' }, "oh_8.5": { id: 8.500, label: 'OH 8.5"' }, "oh_6.125": { id: 6.125, label: 'OH 6-1/8"' }, "oh_6.0": { id: 6.000, label: 'OH 6"' }
+        };
+        const dpDB = {
+            "dp_4_14": { od: 4.000, id: 3.340, label: 'DP 4" - 14 lb' }, "dp_3.5_13.3": { od: 3.500, id: 2.764, label: 'DP 3-1/2" - 13.3 lb' }, "dp_2.875_10.4": { od: 2.875, id: 2.151, label: 'DP 2-7/8" - 10.4 lb' }, "tbg_2.875_6.5": { od: 2.875, id: 2.441, label: 'TBG 2-7/8" - 6.5 lb' }
+        };
+
+        function showMsg(msg, isConfirm, onOk) {
+            document.getElementById('dialogMsg').innerText = msg;
+            document.getElementById('dialogTitle').innerText = isConfirm ? 'Confirmación' : 'Aviso';
+            document.getElementById('btnDialogCancel').style.display = isConfirm ? 'block' : 'none';
+            document.getElementById('customDialog').classList.remove('hidden');
+            document.getElementById('customDialog').classList.add('flex');
+            
+            document.getElementById('btnDialogOk').onclick = function() {
+                document.getElementById('customDialog').classList.add('hidden');
+                document.getElementById('customDialog').classList.remove('flex');
+                if(onOk) onOk();
+            };
+            document.getElementById('btnDialogCancel').onclick = function() {
+                document.getElementById('customDialog').classList.add('hidden');
+                document.getElementById('customDialog').classList.remove('flex');
+            };
+        }
+
+        function procesarLogin() {
+            const nombre = document.getElementById('inpLoginNombre').value.trim();
+            const cargo = document.getElementById('inpLoginCargo').value;
+            if (!nombre || !cargo) { showMsg('Ingrese su Nombre Completo y Cargo.', false); return; }
+            usuarioActual.nombre = nombre; usuarioActual.cargo = cargo;
+            
+            document.getElementById('loginView').classList.add('hidden');
+            document.getElementById('loginView').classList.remove('flex');
+            
+            document.getElementById('dashboardView').classList.remove('hidden');
+            document.getElementById('dashboardView').classList.add('flex');
+            
+            document.getElementById('dashboardUserName').innerText = nombre; 
+            document.getElementById('dashboardUserRole').innerText = cargo;
+            document.getElementById('userInitial').innerText = nombre.charAt(0).toUpperCase();
+            
+            renderizarProyectos();
+        }
+
+        function cerrarSesion() {
+            showMsg('¿Está seguro de que desea cerrar sesión?', true, function() {
+                usuarioActual = { nombre: '', cargo: '', tipo: 'Operador' };
+                document.getElementById('inpLoginNombre').value = ''; 
+                document.getElementById('inpLoginCargo').value = '';
+                document.getElementById('dashboardView').classList.add('hidden'); document.getElementById('dashboardView').classList.remove('flex');
+                document.getElementById('bombeoAppWrapper').classList.add('hidden'); document.getElementById('bombeoAppWrapper').classList.remove('flex');
+                document.getElementById('csvAnalysisView').classList.add('hidden'); document.getElementById('csvAnalysisView').classList.remove('flex');
+                document.getElementById('loginView').classList.remove('hidden'); document.getElementById('loginView').classList.add('flex');
+            });
+        }
+
+        function renderizarProyectos() {
+            const lista = document.getElementById('listaProyectos'); 
+            const proyectos = JSON.parse(localStorage.getItem('proyectos_bombeo_v18')) || []; 
+            lista.innerHTML = '';
+            
+            if(proyectos.length === 0) { 
+                lista.innerHTML = '<p class="text-slate-400 text-sm italic text-center py-4">No hay pozos guardados. Cree uno nuevo para empezar.</p>'; 
+                return; 
+            }
+            
+            proyectos.forEach(p => { 
+                lista.innerHTML += `<div class="bg-slate-800/80 p-3 rounded-lg border border-slate-700 flex justify-between items-center hover:bg-slate-750 transition cursor-pointer" onclick="abrirPozo('${p.id}')"><div><h3 class="text-white font-bold text-sm">${p.nombre}</h3><p class="text-[0.65rem] text-slate-400 mt-1.5 flex items-center gap-2"><span class="bg-slate-900 px-2 py-0.5 rounded border border-slate-600">👤 ${p.creadoPor || 'Desconocido'}</span><span class="text-orange-400">ODT: ${p.odt || 'N/A'}</span></p></div><button class="bg-pink-600 hover:bg-pink-500 text-white px-3 py-1.5 rounded text-xs font-bold transition">Abrir Pozo</button></div>`; 
+            });
+        }
+
+        function crearNuevoPozo() { 
+            document.getElementById('modalNuevoPozo').classList.remove('hidden'); 
+            document.getElementById('modalNuevoPozo').classList.add('flex'); 
+            document.getElementById('inpNewPozoNombre').value = ''; 
+            document.getElementById('inpNewPozoCliente').value = ''; 
+            document.getElementById('inpNewPozoODT').value = ''; 
+        }
+        
+        function cerrarModalNuevoPozo() { 
+            document.getElementById('modalNuevoPozo').classList.add('hidden'); 
+            document.getElementById('modalNuevoPozo').classList.remove('flex'); 
+        }
+        
+        function confirmarNuevoPozo() {
+            const nombre = document.getElementById('inpNewPozoNombre').value.trim(); 
+            if (!nombre) { showMsg("Ingrese el nombre del pozo.", false); return; }
+            
+            currentProjectId = Date.now().toString(); 
+            currentProjectName = nombre; 
+            currentProjectCliente = document.getElementById('inpNewPozoCliente').value.trim(); 
+            currentProjectODT = document.getElementById('inpNewPozoODT').value.trim(); 
+            
+            bomResetSections(); 
+            cerrarModalNuevoPozo(); 
+            iniciarSimuladorBombeo();
+        }
+
+        function abrirPozo(id) {
+            const proyectos = JSON.parse(localStorage.getItem('proyectos_bombeo_v18')) || []; 
+            const p = proyectos.find(x => x.id === id); 
+            if (!p) return;
+            
+            currentProjectId = p.id; 
+            currentProjectName = p.nombre; 
+            currentProjectCliente = p.cliente || ""; 
+            currentProjectODT = p.odt || ""; 
+            
+            bomCasingSections = p.datos.casing || bomCasingSections; 
+            bomTubingSections = p.datos.tubing || bomTubingSections; 
+            bomFluidStages = p.datos.stages || bomFluidStages;
+            
+            document.getElementById('bomInpTargetTop').value = p.datos.targetTop || 10500; 
+            document.getElementById('bomInpTargetBottom').value = p.datos.targetBottom || 10700;
+            document.getElementById('bomInpPBTD').value = p.datos.pbtd || 15000;
+            document.getElementById('bomInpBottomType').value = p.datos.bottomType || 'formacion';
+            document.getElementById('bomInpBottomLeak').value = p.datos.bottomLeak !== undefined ? p.datos.bottomLeak : 1;
+            
+            if(p.datos.isFull !== undefined) {
+                document.getElementById('bomChkFull').checked = p.datos.isFull;
+                document.getElementById('bomInpFluidLevel').value = p.datos.fluidLevel || 0;
+            }
+            
+            iniciarSimuladorBombeo();
+        }
+
+        function guardarPozoActual() {
+            if(!currentProjectId) return; 
+            const proyectos = JSON.parse(localStorage.getItem('proyectos_bombeo_v18')) || []; 
+            const index = proyectos.findIndex(x => x.id === currentProjectId); 
+            
+            let datosActuales = { 
+                casing: bomCasingSections, 
+                tubing: bomTubingSections, 
+                stages: bomFluidStages, 
+                targetTop: document.getElementById('bomInpTargetTop').value, 
+                targetBottom: document.getElementById('bomInpTargetBottom').value, 
+                pbtd: document.getElementById('bomInpPBTD').value, 
+                isFull: document.getElementById('bomChkFull').checked, 
+                fluidLevel: document.getElementById('bomInpFluidLevel').value,
+                bottomType: document.getElementById('bomInpBottomType').value,
+                bottomLeak: document.getElementById('bomInpBottomLeak').value
+            }; 
+            
+            const proyectoGuardar = { 
+                id: currentProjectId, 
+                nombre: currentProjectName, 
+                cliente: currentProjectCliente, 
+                odt: currentProjectODT, 
+                creadoPor: usuarioActual.nombre, 
+                fecha: new Date().toLocaleString(), 
+                datos: datosActuales 
+            };
+            
+            if (index >= 0) proyectos[index] = proyectoGuardar; 
+            else proyectos.push(proyectoGuardar);
+            
+            localStorage.setItem('proyectos_bombeo_v18', JSON.stringify(proyectos));
+        }
+
+        function iniciarSimuladorBombeo() {
+            document.getElementById('dashboardView').classList.add('hidden'); 
+            document.getElementById('dashboardView').classList.remove('flex');
+            document.getElementById('bombeoAppWrapper').classList.remove('hidden');
+            document.getElementById('bombeoAppWrapper').classList.add('flex');
+            
+            document.getElementById('uiHeaderBombeoPozo').innerText = currentProjectName;
+            document.getElementById('uiHeaderClienteBomb').innerText = currentProjectCliente || '--';
+            document.getElementById('uiHeaderODTBomb').innerText = currentProjectODT || '--';
+            
+            bomBuildWell();
+            setTimeout(() => { bomEngine.resize(); bomDaqEngine.resize(); }, 100);
+        }
+
+        function volverAlDashboard() {
+            guardarPozoActual();
+            bomIsPlaying = false; 
+            
+            document.getElementById('bombeoAppWrapper').classList.add('hidden'); 
+            document.getElementById('bombeoAppWrapper').classList.remove('flex');
+            document.getElementById('dashboardView').classList.remove('hidden'); 
+            document.getElementById('dashboardView').classList.add('flex');
+            
+            renderizarProyectos();
+        }
+
+        let bomCasingSections = [{ id: 1, type: "9.625_47.0", top: 0, md: 5000 }, { id: 2, type: "7.0_29.0", top: 4800, md: 9500 }];
+        let bomTubingSections = [{ id: 1, type: "dp_4_14", md: 5000 }, { id: 2, type: "dp_2.875_10.4", md: 9000 }];
+        let bomFluidStages = [];
+        
+        const bomBaseMud = { name: "Agua (Fluido Base)", color: '#0369a1', mw: 8.33, visc: 1 };
+
+        let bomIsPlaying = false;
+        let bomAnnulusOpen = true; 
+        let bomCurrentEvent = 'normal';
+        let bomLastTime = 0;
+        let bomVolPumped = 0; 
+        let bomInjectedVol = 0; 
+        let bomQ = 0; 
+        let bomBasePressure = 150;
+        let bomAutoTrack = true;
+        let bomDirFlow = 'Directa';
+        let currentVTop = 0;
+        let currentVBottom = 1000;
+        let bomStaticTime = 0; 
+
+        let bomStackTubing = []; 
+        let bomStackAnnulus = [];
+        let bomSys = { tubVol: 0, annVol: 0, maxMD: 0, tubProfile: [], annProfile: [] };
+        
+        let bomTargetTop = 10500;
+        let bomTargetBottom = 10700;
+        let bomTargetStack = []; 
+        let bomTargetCapacity = 200; 
+
+        let bomAirVolTubing = 0;
+        let bomAirVolAnnulus = 0;
+
+        let bomCurrentPres = 150;
+        let bomDaqData = [];
+        let bomSimTime = 0;
+        let bomDaqLastCap = 0;
+
+        let usbActive = false;
+        let usbPort = null;
+        let usbReader = null;
+
+        function darken(color, percent) { let num = parseInt(color.replace("#",""), 16), amt = Math.round(2.55 * percent), R = (num >> 16) - amt, B = (num >> 8 & 0x00FF) - amt, G = (num & 0x0000FF) - amt; return "#" + (0x1000000 + (R<255?R<1?0:R:255)*0x10000 + (B<255?B<1?0:B:255)*0x100 + (G<255?G<1?0:G:255)).toString(16).slice(1); }
+        function lighten(color, percent) { let num = parseInt(color.replace("#",""), 16), amt = Math.round(2.55 * percent), R = (num >> 16) + amt, B = (num >> 8 & 0x00FF) + amt, G = (num & 0x0000FF) + amt; return "#" + (0x1000000 + (R<255?R<1?0:R:255)*0x10000 + (B<255?B<1?0:B:255)*0x100 + (G<255?G<1?0:G:255)).toString(16).slice(1); }
+
+        function bomToggleFluidLevel() {
+            const chk = document.getElementById('bomChkFull');
+            const isFull = chk ? chk.checked : true;
+            const div = document.getElementById('bomFluidLevelDiv');
+            if(div) {
+                if(isFull) { div.classList.add('hidden'); div.classList.remove('flex'); } 
+                else { div.classList.remove('hidden'); div.classList.add('flex'); }
+            }
+            bomBuildWell();
+        }
+
+        function bomAddCasing() { if (bomCasingSections.length >= 4) return; let lastMD = bomCasingSections[bomCasingSections.length-1].md; bomCasingSections.push({ id: Date.now(), type: "oh_6.0", top: lastMD - 200, md: lastMD + 1000 }); bomBuildWell(); }
+        function bomRemoveCasing(idx) { if (bomCasingSections.length <= 1) return; bomCasingSections.splice(idx, 1); bomBuildWell(); }
+        function bomAddTubing() { if (bomTubingSections.length >= 4) return; let lastMD = bomTubingSections[bomTubingSections.length-1].md; bomTubingSections.push({ id: Date.now(), type: "tbg_2.875_6.5", md: lastMD + 500 }); bomBuildWell(); }
+        function bomRemoveTubing(idx) { if (bomTubingSections.length <= 1) return; bomTubingSections.splice(idx, 1); bomBuildWell(); }
+        
+        function bomAddStage() { 
+            const defaultColors = ['#f43f5e', '#eab308', '#a855f7', '#10b981'];
+            const nC = defaultColors[bomFluidStages.length % defaultColors.length];
+            bomFluidStages.push({ id: Date.now(), name: "Lodo Nuevo", vol: 20, mw: 14.5, visc: 15, color: nC, tracked: false, pumped: 0 }); 
+            if(bomFluidStages.length === 1) bomFluidStages[0].tracked = true;
+            bomRenderUI(); 
+        }
+        function bomRemoveStage(idx) { bomFluidStages.splice(idx, 1); bomRenderUI(); }
+        function bomSetTracked(idx) { bomFluidStages.forEach(s => s.tracked = false); bomFluidStages[idx].tracked = true; bomRenderUI(); }
+        
+        function bomResetSections() { 
+            bomCasingSections = [{ id: 1, type: "9.625_47.0", top: 0, md: 5000 }, { id: 2, type: "7.0_29.0", top: 4800, md: 9500 }, { id: 3, type: "oh_6.0", top: 9500, md: 11000 }]; 
+            bomTubingSections = [{ id: 1, type: "dp_4_14", md: 5000 }, { id: 2, type: "dp_2.875_10.4", md: 10600 }]; 
+            bomFluidStages = [
+                { id: 1, name: "Espaciador Viscoso", vol: 15, mw: 8.5, visc: 40, color: "#eab308", tracked: false, pumped: 0 }, 
+                { id: 2, name: "Ácido 15%", vol: 40, mw: 9.0, visc: 1, color: "#f43f5e", tracked: true, pumped: 0 }, 
+                { id: 3, name: "Desplazamiento (Agua)", vol: 80, mw: 8.33, visc: 1, color: "#38bdf8", tracked: false, pumped: 0 }
+            ]; 
+            document.getElementById('bomInpTargetTop').value = 10500;
+            document.getElementById('bomInpTargetBottom').value = 10700;
+            document.getElementById('bomInpPBTD').value = 15000;
+            document.getElementById('bomChkFull').checked = true;
+            document.getElementById('bomInpBottomType').value = 'formacion';
+            document.getElementById('bomInpBottomLeak').value = 1;
+            bomToggleFluidLevel();
+        }
+
+        function bomRenderUI() {
+            let cHtml = '';
+            bomCasingSections.forEach((sec, idx) => {
+                let options = ''; for (const [key, data] of Object.entries(casingDB)) { options += `<option value="${key}" ${key===sec.type?'selected':''}>${data.label}</option>`; }
+                cHtml += `<div class="grid grid-cols-12 gap-1 items-center bg-slate-800/50 p-1.5 rounded border border-slate-700 shadow-sm mb-1"><div class="col-span-1 text-[0.65rem] text-slate-500 font-black text-center">${idx+1}</div><div class="col-span-5"><select class="input-field py-1 px-1 text-[0.65rem] w-full bg-slate-900" onchange="bomCasingSections[${idx}].type = this.value; bomBuildWell();">${options}</select></div><div class="col-span-3"><input type="number" class="input-field py-1 px-1 text-[0.65rem] w-full text-center bg-slate-900" value="${sec.top}" onchange="bomCasingSections[${idx}].top = parseFloat(this.value); bomBuildWell();"></div><div class="col-span-3 flex gap-1"><input type="number" class="input-field py-1 px-1 text-[0.65rem] w-full text-center bg-slate-900" value="${sec.md}" onchange="bomCasingSections[${idx}].md = parseFloat(this.value); bomBuildWell();">${idx > 0 ? `<button onclick="bomRemoveCasing(${idx})" class="text-rose-500 hover:text-rose-400 font-bold px-1 rounded bg-rose-950/30">✕</button>` : ``}</div></div>`;
+            }); document.getElementById('bomCasingList').innerHTML = cHtml;
+
+            let tHtml = '';
+            bomTubingSections.forEach((sec, idx) => {
+                let options = ''; for (const [key, data] of Object.entries(dpDB)) { options += `<option value="${key}" ${key===sec.type?'selected':''}>${data.label}</option>`; }
+                tHtml += `<div class="grid grid-cols-12 gap-1 items-center bg-slate-800/50 p-1.5 rounded border border-slate-700 shadow-sm mb-1"><div class="col-span-1 text-[0.65rem] text-slate-500 font-black text-center">${idx+1}</div><div class="col-span-8"><select class="input-field py-1 px-1 text-[0.65rem] w-full bg-slate-900" onchange="bomTubingSections[${idx}].type = this.value; bomBuildWell();">${options}</select></div><div class="col-span-3 flex gap-1"><input type="number" class="input-field py-1 px-1 text-[0.65rem] w-full text-center bg-slate-900" value="${sec.md}" onchange="bomTubingSections[${idx}].md = parseFloat(this.value); bomBuildWell();">${idx > 0 ? `<button onclick="bomRemoveTubing(${idx})" class="text-rose-500 hover:text-rose-400 font-bold px-1 rounded bg-rose-950/30">✕</button>` : ``}</div></div>`;
+            }); document.getElementById('bomTubingList').innerHTML = tHtml;
+
+            let sHtml = '';
+            bomFluidStages.forEach((stg, idx) => { 
+                let viscOptions = `
+                    <option value="1" ${stg.visc==1?'selected':''}>Agua (1 cp)</option>
+                    <option value="5" ${stg.visc==5?'selected':''}>Aceite Ligero (5 cp)</option>
+                    <option value="15" ${stg.visc==15?'selected':''}>Lodo Normal (15 cp)</option>
+                    <option value="40" ${stg.visc==40?'selected':''}>Píldora Visc. (40 cp)</option>
+                    <option value="100" ${stg.visc==100?'selected':''}>Polímero Pesado (100 cp)</option>
+                `;
+                
+                let isComplete = stg.pumped >= stg.vol;
+                
+                sHtml += `<div class="grid grid-cols-12 gap-1 items-center p-1.5 rounded border transition-all ${stg.tracked ? 'bg-pink-900/30 border-pink-500 shadow-[0_0_8px_rgba(236,72,153,0.4)]' : (isComplete ? 'bg-emerald-900/20 border-emerald-800/50 opacity-60' : 'bg-slate-800/80 border-slate-700')}">
+                    <div class="col-span-1 flex justify-center"><input type="radio" name="trkFluid" class="w-3 h-3 accent-pink-500 cursor-pointer" ${stg.tracked ? 'checked' : ''} onchange="bomSetTracked(${idx})"></div>
+                    <div class="col-span-3"><input type="text" class="input-field py-1 px-1 text-[0.6rem] font-bold text-white bg-slate-900 w-full" value="${stg.name}" onchange="bomFluidStages[${idx}].name = this.value"></div>
+                    <div class="col-span-2"><input type="number" step="0.1" class="input-field py-1 px-1 text-[0.65rem] text-center bg-slate-900 text-sky-300 w-full" value="${stg.mw}" title="Densidad PPG" onchange="bomFluidStages[${idx}].mw = parseFloat(this.value)"></div>
+                    <div class="col-span-2"><select class="input-field py-1 px-0 text-[0.55rem] w-full text-center bg-slate-900 text-amber-300" onchange="bomFluidStages[${idx}].visc = parseFloat(this.value)">${viscOptions}</select></div>
+                    <div class="col-span-2 relative text-center">
+                        <input type="number" class="input-field py-1 px-1 text-[0.65rem] text-center bg-slate-900 w-full" value="${stg.vol}" onchange="bomFluidStages[${idx}].vol = parseFloat(this.value)">
+                        <span class="absolute bottom-[-10px] left-0 w-full text-[0.5rem] font-bold ${isComplete ? 'text-emerald-400' : 'text-slate-400'}">${(stg.pumped||0).toFixed(1)} / ${stg.vol}</span>
+                    </div>
+                    <div class="col-span-1 flex justify-center"><input type="color" class="w-4 h-4 rounded cursor-pointer bg-transparent border border-slate-600 p-0 hover:scale-110 transition-transform" value="${stg.color}" onchange="bomFluidStages[${idx}].color = this.value"></div>
+                    <div class="col-span-1 text-center"><button onclick="bomRemoveStage(${idx})" class="text-rose-500 hover:text-rose-400 font-bold text-xs bg-rose-950/50 px-1 py-0.5 rounded border border-rose-900/50">✕</button></div>
+                </div>`; 
+            });
+            if(bomFluidStages.length === 0) sHtml = `<div class="text-center text-xs text-slate-500 py-4 italic bg-slate-800/30 rounded border border-slate-800 border-dashed">Sin etapas creadas. Bombeando Agua/Lodo Base.</div>`;
+            document.getElementById('bomStageList').innerHTML = sHtml;
+        }
+
+        function bomBuildWell() {
+            bomCasingSections.sort((a,b) => a.top - b.top); 
+            bomTubingSections.sort((a,b) => a.md - b.md);
+            
+            let pbtd = parseFloat(document.getElementById('bomInpPBTD').value) || 15000;
+
+            bomSys.maxMD = Math.min(pbtd, Math.max(...bomCasingSections.map(c=>c.md), ...bomTubingSections.map(t=>t.md)));
+            bomSys.tubProfile = []; bomSys.annProfile = []; bomSys.tubVol = 0; bomSys.annVol = 0;
+
+            bomTargetTop = parseFloat(document.getElementById('bomInpTargetTop').value) || 0;
+            bomTargetBottom = parseFloat(document.getElementById('bomInpTargetBottom').value) || 0;
+
+            let prevTubMD = 0;
+            bomTubingSections.forEach(ts => { 
+                let limitMD = Math.min(ts.md, bomSys.maxMD);
+                let L = limitMD - prevTubMD; 
+                if (L > 0) { 
+                    let typeID = ts.type; let id_in = dpDB[typeID]?.id || 2.441; let od_in = dpDB[typeID]?.od || 2.875; let cap = (id_in * id_in) / 1029.4; let vol = cap * L; 
+                    bomSys.tubProfile.push({ top: prevTubMD, bottom: limitMD, id: id_in, od: od_in, cap: cap, vol: vol }); bomSys.tubVol += vol; 
+                    prevTubMD = limitMD; 
+                } 
+            });
+
+            let breaks = new Set([0, bomSys.maxMD]); 
+            bomCasingSections.forEach(c => { if(c.top < bomSys.maxMD) breaks.add(c.top); if(c.md < bomSys.maxMD) breaks.add(c.md); }); 
+            bomTubingSections.forEach(t => { if(t.md < bomSys.maxMD) breaks.add(t.md); }); 
+            let sortedBreaks = Array.from(breaks).sort((a,b) => a-b);
+            
+            for (let i = 0; i < sortedBreaks.length - 1; i++) {
+                let top = sortedBreaks[i]; let bottom = sortedBreaks[i+1]; let mid = (top + bottom) / 2;
+                
+                let activeCasings = bomCasingSections.filter(c => c.top <= mid && c.md > mid);
+                let dh_in = 6.0; if(activeCasings.length > 0) dh_in = Math.min(...activeCasings.map(c => casingDB[c.type]?.id || 6.0));
+                
+                let tub = bomSys.tubProfile.find(t => t.top <= mid && t.bottom > mid);
+                let dp_od = tub ? tub.od : 0;
+                
+                let capAnn = 0; if (dh_in > dp_od) capAnn = (dh_in * dh_in - dp_od * dp_od) / 1029.4;
+                
+                let L = bottom - top; let vol = capAnn * L;
+                if (bomSys.annProfile.length > 0 && Math.abs(bomSys.annProfile[bomSys.annProfile.length-1].cap - capAnn) < 0.0001 && Math.abs(bomSys.annProfile[bomSys.annProfile.length-1].dh - dh_in) < 0.0001) { 
+                    bomSys.annProfile[bomSys.annProfile.length-1].bottom = bottom; bomSys.annProfile[bomSys.annProfile.length-1].vol += vol; 
+                } else { 
+                    bomSys.annProfile.push({ top: top, bottom: bottom, dh: dh_in, dp: dp_od, cap: capAnn, vol: vol }); 
+                }
+                bomSys.annVol += vol;
+            }
+
+            bomAirVolTubing = 0; bomAirVolAnnulus = 0;
+            const isFull = document.getElementById('bomChkFull').checked;
+            let reqFillVol = 0;
+            if(!isFull) {
+                let fLvl = parseFloat(document.getElementById('bomInpFluidLevel').value) || 0;
+                if(fLvl > bomSys.maxMD) fLvl = bomSys.maxMD;
+                
+                let currTop = 0;
+                for(let sec of bomSys.tubProfile) {
+                    if (currTop >= fLvl) break;
+                    let bottom = Math.min(sec.bottom, fLvl);
+                    bomAirVolTubing += sec.cap * (bottom - currTop);
+                    currTop = bottom;
+                }
+                currTop = 0;
+                for(let sec of bomSys.annProfile) {
+                    if (currTop >= fLvl) break;
+                    let bottom = Math.min(sec.bottom, fLvl);
+                    bomAirVolAnnulus += sec.cap * (bottom - currTop);
+                    currTop = bottom;
+                }
+                reqFillVol = bomAirVolTubing + bomAirVolAnnulus;
+            }
+            document.getElementById('bomVolToFill').innerText = reqFillVol.toFixed(1) + " bbl";
+
+            document.getElementById('bomCapTubing').innerText = bomSys.tubVol.toFixed(1) + " bbl";
+            document.getElementById('bomCapAnnulus').innerText = bomSys.annVol.toFixed(1) + " bbl";
+            document.getElementById('bomCapTotal').innerText = (bomSys.tubVol + bomSys.annVol).toFixed(1) + " bbl";
+
+            bomRenderUI(); bomReset();
+        }
+
+        function bomSetEvent(evt) {
+            bomCurrentEvent = evt;
+            document.getElementById('btnEvtNormal').className = "bg-slate-800 border border-slate-600 text-cyan-400 py-2 rounded text-[0.65rem] font-bold uppercase transition";
+            document.getElementById('btnEvtTapado').className = "bg-slate-800 border border-slate-600 text-rose-500 hover:bg-rose-900/30 py-2 rounded text-[0.65rem] font-bold uppercase transition";
+            document.getElementById('btnEvtAdmision').className = "bg-slate-800 border border-slate-600 text-amber-500 hover:bg-amber-900/30 py-2 rounded text-[0.65rem] font-bold uppercase transition";
+            document.getElementById('bomWarningOverlay').classList.add('hidden'); document.getElementById('bomWarningOverlay').classList.remove('flex');
+            
+            if (evt === 'normal') document.getElementById('btnEvtNormal').className = "bg-cyan-900 border border-cyan-500 text-white py-2 rounded text-[0.65rem] font-bold uppercase transition shadow-[0_0_10px_rgba(6,182,212,0.4)] scale-105";
+            if (evt === 'tapado') { document.getElementById('btnEvtTapado').className = "bg-rose-900 border border-rose-500 text-white py-2 rounded text-[0.65rem] font-bold uppercase transition shadow-[0_0_10px_rgba(244,63,94,0.4)] scale-105"; document.getElementById('bomWarningOverlay').classList.remove('hidden'); document.getElementById('bomWarningOverlay').classList.add('flex'); }
+            if (evt === 'admision') document.getElementById('btnEvtAdmision').className = "bg-amber-900 border border-amber-500 text-white py-2 rounded text-[0.65rem] font-bold uppercase transition shadow-[0_0_10px_rgba(245,158,11,0.4)] scale-105";
+            bomUpdateControls();
+        }
+
+        function bomReset() {
+            bomIsPlaying = false; 
+            bomVolPumped = 0; 
+            bomInjectedVol = 0; 
+            
+            document.getElementById('btnBomPlay').innerHTML = "▶ INICIAR BOMBA"; 
+            document.getElementById('btnBomPlay').className = "bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-lg shadow-[0_0_15px_rgba(16,185,129,0.3)] transition tracking-wider";
+            
+            bomAirVolTubing = 0; bomAirVolAnnulus = 0;
+            const isFull = document.getElementById('bomChkFull').checked;
+            if(!isFull) {
+                let fLvl = parseFloat(document.getElementById('bomInpFluidLevel').value) || 0;
+                if(fLvl > bomSys.maxMD) fLvl = bomSys.maxMD;
+                
+                let currTop = 0;
+                for(let sec of bomSys.tubProfile) {
+                    if (currTop >= fLvl) break;
+                    let bottom = Math.min(sec.bottom, fLvl);
+                    bomAirVolTubing += sec.cap * (bottom - currTop);
+                    currTop = bottom;
+                }
+                currTop = 0;
+                for(let sec of bomSys.annProfile) {
+                    if (currTop >= fLvl) break;
+                    let bottom = Math.min(sec.bottom, fLvl);
+                    bomAirVolAnnulus += sec.cap * (bottom - currTop);
+                    currTop = bottom;
+                }
+            }
+
+            bomStackTubing = [{ ...bomBaseMud, vol: Math.max(0, bomSys.tubVol - bomAirVolTubing) }]; 
+            bomStackAnnulus = [{ ...bomBaseMud, vol: Math.max(0, bomSys.annVol - bomAirVolAnnulus) }];
+            bomTargetStack = []; 
+            bomSetEvent('normal');
+            
+            bomFluidStages.forEach(s => s.pumped = 0);
+            bomRenderUI();
+            
+            currentVTop = 0;
+            currentVBottom = Math.max(1000, bomSys.maxMD);
+            bomStaticTime = 0;
+
+            bomDaqData = [];
+            bomSimTime = 0;
+            bomDaqLastCap = 0;
+
+            bomUpdateControls(); 
+            bomDraw();
+            if(bomDaqEngine) bomDaqEngine.draw();
+        }
+
+        document.getElementById('bomSliderQ').addEventListener('input', function(e) { document.getElementById('bomSensorQ').value = e.target.value; bomQ = parseFloat(e.target.value); bomUpdateControls(); });
+        document.getElementById('bomSensorQ').addEventListener('input', function(e) { document.getElementById('bomSliderQ').value = e.target.value; bomQ = parseFloat(e.target.value) || 0; bomUpdateControls(); });
+        document.getElementById('bomToggleBOP').addEventListener('change', function(e) { bomAnnulusOpen = !e.target.checked; document.getElementById('bomLblBOP').innerHTML = bomAnnulusOpen ? "ABIERTA<br>(Retorno Normal)" : "CERRADA<br>(Squeeze / Inyección)"; document.getElementById('bomLblBOP').className = bomAnnulusOpen ? "text-xs font-bold text-emerald-400 tracking-wide text-center mt-1 block" : "text-xs font-bold text-rose-500 tracking-wide text-center mt-1 block animate-pulse"; bomUpdateControls(); });
+
+        function bomPlay() {
+            if (bomIsPlaying) { 
+                bomIsPlaying = false; 
+                document.getElementById('btnBomPlay').innerHTML = "▶ CONTINUAR BOMBA"; 
+                document.getElementById('btnBomPlay').className = "bg-emerald-600 hover:bg-emerald-500 text-white font-black py-3 rounded-lg shadow-[0_0_15px_rgba(16,185,129,0.3)] transition tracking-wider"; 
+            } else { 
+                bomIsPlaying = true; 
+                document.getElementById('btnBomPlay').innerHTML = "⏸ PAUSAR BOMBA"; 
+                document.getElementById('btnBomPlay').className = "bg-amber-600 hover:bg-amber-500 text-slate-900 font-black py-3 rounded-lg shadow-[0_0_15px_rgba(245,158,11,0.3)] transition tracking-wider"; 
+            }
+        }
+
+        function getMDFromVol(targetVol, profile) {
+            let currentV = 0; for (let i = 0; i < profile.length; i++) { let sec = profile[i]; if (targetVol <= currentV + sec.vol) { let remVol = targetVol - currentV; return sec.top + (remVol / sec.cap); } currentV += sec.vol; }
+            return profile.length > 0 ? profile[profile.length-1].bottom : 0;
+        }
+
+        function bomLoop(timestamp) {
+            if (!bomLastTime) bomLastTime = timestamp;
+            let dt = timestamp - bomLastTime; 
+            bomLastTime = timestamp;
+            
+            // Suspender visual si no está visible para ahorrar CPU
+            if (document.getElementById('bombeoAppWrapper').classList.contains('hidden')) {
+                requestAnimationFrame(bomLoop);
+                return;
+            }
+            
+            let speedFactor = 15.0; 
+            // Si la bomba está apagada, el caudal es cero, pero el ciclo y las físicas siguen
+            let activeQ = bomIsPlaying ? bomQ : 0;
+            let uTubeFlow = 0;
+            
+            let p_tub = 0; let currTubV = bomAirVolTubing;
+            for(let b of bomStackTubing) {
+                let topMD = getMDFromVol(currTubV, bomSys.tubProfile);
+                let botMD = getMDFromVol(currTubV + b.vol, bomSys.tubProfile);
+                p_tub += (botMD - topMD) * (b.mw || 9.0) * 0.052;
+                currTubV += b.vol;
+            }
+
+            let p_ann = 0; let currAnnV = bomAirVolAnnulus;
+            let botUpProfile = [...bomSys.annProfile].reverse().map(s => ({ top: bomSys.maxMD - s.bottom, bottom: bomSys.maxMD - s.top, cap: s.cap, vol: s.vol, dh: s.dh, dp: s.dp }));
+            
+            for(let b of bomStackAnnulus) {
+                let botUpTop = getMDFromVol(currAnnV, botUpProfile);
+                let botUpBot = getMDFromVol(currAnnV + b.vol, botUpProfile);
+                let topMD = bomSys.maxMD - botUpBot;
+                let botMD = bomSys.maxMD - botUpTop;
+                p_ann += (botMD - topMD) * (b.mw || 9.0) * 0.052;
+                currAnnV += b.vol;
+            }
+
+            let pDif = p_tub - p_ann;
+            if (bomDirFlow === 'Inversa') pDif = -pDif;
+
+            if (bomAnnulusOpen && bomCurrentEvent !== 'tapado' && pDif > 20) {
+                bomStaticTime += dt;
+                uTubeFlow = (pDif * 0.2) * (dt / 60000) * speedFactor / 42; 
+            } else if (activeQ === 0) {
+                bomStaticTime += dt;
+            } else {
+                bomStaticTime = 0;
+            }
+
+            let pump_dV = (bomCurrentEvent === 'tapado') ? 0 : (activeQ * (dt / 60000) / 42) * speedFactor;
+
+            if (pump_dV > 0 || uTubeFlow > 0) {
+                if(activeQ > 0) bomVolPumped += pump_dV;
+                
+                let inFluid = { ...bomBaseMud };
+                let trkIdx = bomFluidStages.findIndex(s => s.tracked);
+                
+                if (trkIdx >= 0 && activeQ > 0) {
+                    let stg = bomFluidStages[trkIdx]; 
+                    if (!stg.pumped) stg.pumped = 0;
+                    if (stg.pumped < stg.vol) {
+                        inFluid = { stageId: stg.id, color: stg.color, mw: stg.mw, visc: stg.visc }; 
+                        stg.pumped += pump_dV;
+                        if (stg.pumped >= stg.vol) { 
+                            stg.pumped = stg.vol;
+                            let nextIdx = trkIdx + 1;
+                            if (nextIdx < bomFluidStages.length) {
+                                bomFluidStages.forEach(s => s.tracked = false);
+                                bomFluidStages[nextIdx].tracked = true;
+                            } else {
+                                bomFluidStages.forEach(s => s.tracked = false);
+                            }
+                            bomRenderUI();
+                        }
+                    } else {
+                        inFluid = { stageId: 0, color: bomBaseMud.color, mw: bomBaseMud.mw, visc: bomBaseMud.visc };
+                    }
+                } else if (activeQ > 0) {
+                    inFluid = { stageId: 0, color: bomBaseMud.color, mw: bomBaseMud.mw, visc: bomBaseMud.visc };
+                }
+
+                if (bomDirFlow === 'Directa') {
+                    if (pump_dV > 0) {
+                        if (bomStackTubing.length > 0 && bomStackTubing[0].stageId === inFluid.stageId) { bomStackTubing[0].vol += pump_dV; } else { bomStackTubing.unshift({ ...inFluid, vol: pump_dV }); }
+                    }
+
+                    let flow_in = pump_dV;
+                    let flow_out = pump_dV + uTubeFlow; 
+
+                    bomAirVolTubing += (flow_out - flow_in);
+                    if (bomAirVolTubing < 0) bomAirVolTubing = 0; 
+
+                    let tubSum = 0; let spillVol = 0; let spillFluid = null;
+                    for (let i = 0; i < bomStackTubing.length; i++) { tubSum += bomStackTubing[i].vol; }
+                    
+                    let limitTubVol = Math.max(0, bomSys.tubVol - bomAirVolTubing);
+                    while (tubSum > limitTubVol + 0.0001) {
+                        let excess = tubSum - limitTubVol; let lastBlock = bomStackTubing[bomStackTubing.length - 1];
+                        if (lastBlock.vol > excess) { lastBlock.vol -= excess; spillVol += excess; spillFluid = { ...lastBlock }; tubSum -= excess; } 
+                        else { spillVol += lastBlock.vol; spillFluid = { ...lastBlock }; tubSum -= lastBlock.vol; bomStackTubing.pop(); }
+                    }
+
+                    if (spillVol > 0) {
+                        let bType = document.getElementById('bomInpBottomType')?.value || 'formacion';
+                        let bLeak = parseFloat(document.getElementById('bomInpBottomLeak')?.value || 1);
+                        
+                        let volAnular = 0;
+                        let volFormacion = 0;
+                        
+                        if (bType === 'tapon') {
+                            volFormacion = spillVol * bLeak;
+                            volAnular = spillVol - volFormacion;
+                        } else {
+                            if (!bomAnnulusOpen) {
+                                volFormacion = spillVol;
+                                volAnular = 0;
+                            } else {
+                                volAnular = spillVol;
+                                volFormacion = 0;
+                            }
+                        }
+
+                        if (volAnular > 0 && bomCurrentEvent !== 'admision') {
+                            if (bomStackAnnulus.length > 0 && bomStackAnnulus[0].stageId === spillFluid.stageId) { bomStackAnnulus[0].vol += volAnular; } else { bomStackAnnulus.unshift({ ...spillFluid, vol: volAnular }); }
+                            
+                            bomAirVolAnnulus -= volAnular;
+                            if (bomAirVolAnnulus < 0) bomAirVolAnnulus = 0;
+
+                            let annSum = 0; for (let i = 0; i < bomStackAnnulus.length; i++) { annSum += bomStackAnnulus[i].vol; }
+                            let limitAnnVol = Math.max(0, bomSys.annVol - bomAirVolAnnulus);
+
+                            while (annSum > limitAnnVol + 0.0001) { 
+                                let excess = annSum - limitAnnVol; let lastBlock = bomStackAnnulus[bomStackAnnulus.length - 1]; 
+                                if (lastBlock.vol > excess) { lastBlock.vol -= excess; annSum -= excess; } else { annSum -= lastBlock.vol; bomStackAnnulus.pop(); } 
+                            }
+                        }
+                        
+                        if (volFormacion > 0) {
+                            if(activeQ > 0) bomInjectedVol += volFormacion;
+                            if (bomTargetStack.length > 0 && bomTargetStack[0].stageId === spillFluid.stageId) { bomTargetStack[0].vol += volFormacion; } else { bomTargetStack.unshift({ ...spillFluid, vol: volFormacion }); }
+                            let targetSum = 0; for (let i = 0; i < bomTargetStack.length; i++) { targetSum += bomTargetStack[i].vol; }
+                            while (targetSum > bomTargetCapacity + 0.0001) { let excess = targetSum - bomTargetCapacity; let lastBlock = bomTargetStack[bomTargetStack.length - 1]; if (lastBlock.vol > excess) { lastBlock.vol -= excess; targetSum -= excess; } else { targetSum -= lastBlock.vol; bomTargetStack.pop(); } }
+                        }
+                    }
+                } else {
+                    // Flujo Inverso
+                    if (pump_dV > 0) {
+                        if (bomStackAnnulus.length > 0 && bomStackAnnulus[bomStackAnnulus.length-1].stageId === inFluid.stageId) { bomStackAnnulus[bomStackAnnulus.length-1].vol += pump_dV; } else { bomStackAnnulus.push({ ...inFluid, vol: pump_dV }); }
+                    }
+
+                    let flow_in = pump_dV;
+                    let flow_out = pump_dV + uTubeFlow; 
+
+                    bomAirVolAnnulus += (flow_out - flow_in);
+                    if(bomAirVolAnnulus < 0) bomAirVolAnnulus = 0;
+
+                    let annSum = 0; let spillVol = 0; let spillFluid = null;
+                    for (let i = 0; i < bomStackAnnulus.length; i++) { annSum += bomStackAnnulus[i].vol; }
+                    let limitAnnVol = Math.max(0, bomSys.annVol - bomAirVolAnnulus);
+
+                    while (annSum > limitAnnVol + 0.0001) {
+                        let excess = annSum - limitAnnVol; let firstBlock = bomStackAnnulus[0];
+                        if (firstBlock.vol > excess) { firstBlock.vol -= excess; spillVol += excess; spillFluid = { ...firstBlock }; annSum -= excess; } 
+                        else { spillVol += firstBlock.vol; spillFluid = { ...firstBlock }; annSum -= firstBlock.vol; bomStackAnnulus.shift(); }
+                    }
+
+                    if (spillVol > 0 && bomCurrentEvent !== 'admision') {
+                        let bType = document.getElementById('bomInpBottomType')?.value || 'formacion';
+                        let bLeak = parseFloat(document.getElementById('bomInpBottomLeak')?.value || 1);
+                        
+                        let volTuberia = 0;
+                        let volFormacion = 0;
+                        
+                        if (bType === 'tapon') {
+                            volFormacion = spillVol * bLeak;
+                            volTuberia = spillVol - volFormacion;
+                        } else {
+                            if (!bomAnnulusOpen) { volFormacion = spillVol; volTuberia = 0; } 
+                            else { volTuberia = spillVol; volFormacion = 0; }
+                        }
+                        
+                        if (volTuberia > 0) {
+                            if (bomStackTubing.length > 0 && bomStackTubing[bomStackTubing.length-1].stageId === spillFluid.stageId) { bomStackTubing[bomStackTubing.length-1].vol += volTuberia; } else { bomStackTubing.push({ ...spillFluid, vol: volTuberia }); }
+                            
+                            bomAirVolTubing -= volTuberia;
+                            if(bomAirVolTubing < 0) bomAirVolTubing = 0;
+
+                            let tubSum = 0; for (let i = 0; i < bomStackTubing.length; i++) { tubSum += bomStackTubing[i].vol; }
+                            let limitTubVol = Math.max(0, bomSys.tubVol - bomAirVolTubing);
+
+                            while (tubSum > limitTubVol + 0.0001) { let excess = tubSum - limitTubVol; let firstBlock = bomStackTubing[0]; if (firstBlock.vol > excess) { firstBlock.vol -= excess; tubSum -= excess; } else { tubSum -= firstBlock.vol; bomStackTubing.shift(); } }
+                        }
+                    }
+                }
+            }
+            
+            bomSimTime += dt;
+            if (bomSimTime - bomDaqLastCap > 300) { 
+                let stgVol = 0;
+                let trkIdx = bomFluidStages.findIndex(s => s.tracked);
+                if (trkIdx >= 0) stgVol = bomFluidStages[trkIdx].pumped || 0;
+                
+                bomDaqData.push({ t: bomSimTime, q: activeQ, p: bomCurrentPres, vt: bomVolPumped, ve: stgVol });
+                if (bomDaqData.length > 300) bomDaqData.shift(); 
+                bomDaqLastCap = bomSimTime;
+                if(bomDaqEngine) bomDaqEngine.draw();
+            }
+
+            bomUpdateControls(); 
+            bomDraw();
+            requestAnimationFrame(bomLoop);
+        }
+
+        const bomEngine = {
+            canvas: null, ctx: null, width: 0, height: 0,
+            init() { this.canvas = document.getElementById('bomCanvas'); if(this.canvas){ this.ctx = this.canvas.getContext('2d'); this.resize(); window.addEventListener('resize', () => { this.resize(); }); } },
+            resize() { if(!this.canvas || !this.canvas.parentElement) return; const rect = this.canvas.parentElement.getBoundingClientRect(); const dpr = window.devicePixelRatio || 1; this.canvas.width = rect.width * dpr; this.canvas.height = rect.height * dpr; this.ctx.scale(dpr, dpr); this.width = rect.width; this.height = rect.height; bomDraw(); }
+        };
+
+        const bomDaqEngine = {
+            canvas: null, ctx: null, width: 0, height: 0,
+            init() { this.canvas = document.getElementById('bomDaqCanvas'); if(this.canvas){ this.ctx = this.canvas.getContext('2d'); this.resize(); window.addEventListener('resize', () => { this.resize(); }); } },
+            resize() { if(!this.canvas || !this.canvas.parentElement) return; const rect = this.canvas.parentElement.getBoundingClientRect(); const dpr = window.devicePixelRatio || 1; this.canvas.width = rect.width * dpr; this.canvas.height = rect.height * dpr; this.ctx.scale(dpr, dpr); this.width = rect.width; this.height = rect.height; this.draw(); },
+            draw() {
+                if(!this.ctx) return;
+                const ctx = this.ctx; const W = this.width; const H = this.height;
+                ctx.clearRect(0, 0, W, H);
+                
+                ctx.strokeStyle = 'rgba(6, 182, 212, 0.2)'; ctx.lineWidth = 1;
+                ctx.beginPath();
+                for(let i=1; i<5; i++) { let y = (H/5)*i; ctx.moveTo(0, y); ctx.lineTo(W, y); }
+                for(let i=1; i<10; i++) { let x = (W/10)*i; ctx.moveTo(x, 0); ctx.lineTo(x, H); }
+                ctx.stroke();
+
+                if (bomDaqData.length < 2) return;
+
+                const drawLine = (key, color, maxVal, isGlow) => {
+                    ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.lineJoin = 'round';
+                    if (isGlow) { ctx.shadowBlur = 8; ctx.shadowColor = color; } else { ctx.shadowBlur = 0; }
+                    let stepX = W / 300; 
+                    for(let i=0; i<bomDaqData.length; i++) {
+                        let x = W - ((bomDaqData.length - 1 - i) * stepX);
+                        let y = H - (Math.min(bomDaqData[i][key], maxVal) / maxVal) * (H - 10) - 5;
+                        if(i===0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                    }
+                    ctx.stroke(); ctx.shadowBlur = 0; 
+                };
+
+                let maxVol = (bomSys.tubVol + bomSys.annVol) * 1.5 || 500;
+                drawLine('q', '#ec4899', 600, false);   
+                drawLine('p', '#06b6d4', 6000, true);  
+                drawLine('vt', '#10b981', maxVol, false); 
+                drawLine('ve', '#fbbf24', 200, false);  
+
+                ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.font = '9px Arial'; ctx.textAlign = 'left';
+                ctx.fillText("5000p", 5, 15); ctx.fillText("2500p", 5, H/2 + 4);
+            }
+        };
+
+        function bomUpdateControls() {
+            const elV = document.getElementById('bomOutVol'); if(elV) elV.innerText = bomVolPumped.toFixed(1);
+            const elI = document.getElementById('bomOutInj'); if(elI) elI.innerText = bomInjectedVol.toFixed(1);
+            
+            let activeQ = bomIsPlaying ? bomQ : 0;
+            
+            if (!usbActive) {
+                let avgVisc = 1;
+                let totalViscVol = 0, sumVol = 0;
+                
+                if (bomStackTubing.length > 0) {
+                    bomStackTubing.forEach(b => { totalViscVol += (b.visc || 1) * b.vol; sumVol += b.vol; });
+                    if (sumVol > 0) { avgVisc = totalViscVol / sumVol; }
+                }
+
+                let pres = bomBasePressure;
+                const containerPres = document.getElementById('bomPresContainer');
+                const lblPres = document.getElementById('bomLblPres');
+                const statBadge = document.getElementById('bomStatusBadge');
+                
+                let bottomType = document.getElementById('bomInpBottomType')?.value || 'formacion';
+                let bottomLeak = document.getElementById('bomInpBottomLeak')?.value || '1';
+
+                if (bottomType === 'tapon' && bottomLeak === '0' && !bomAnnulusOpen && activeQ > 0) {
+                    bomCurrentEvent = 'tapado';
+                }
+
+                if (bomCurrentEvent === 'tapado') {
+                    pres = 5000 + (Math.random() * 500); 
+                    if(containerPres) containerPres.className = "glass-panel p-3 text-center border-t-2 border-t-rose-600 bg-rose-950/40 flex flex-col justify-center shadow-lg transition-colors duration-300 animate-pulse";
+                    if(lblPres) lblPres.innerText = "PRESIÓN CRÍTICA";
+                    if(statBadge) { statBadge.innerText = "BLOQUEO DETECTADO"; statBadge.className = "text-[0.65rem] font-bold px-2 py-1 rounded bg-rose-600 text-white border border-rose-500 animate-pulse"; }
+                } else if (bomCurrentEvent === 'admision') {
+                    pres += (activeQ * 0.3); 
+                    if(containerPres) containerPres.className = "glass-panel p-3 text-center border-t-2 border-t-amber-500 bg-amber-950/20 flex flex-col justify-center shadow-lg transition-colors duration-300";
+                    if(lblPres) lblPres.innerText = "Presión (Baja)";
+                    if(statBadge) { statBadge.innerText = "PÉRDIDA CIRCULACIÓN"; statBadge.className = "text-[0.65rem] font-bold px-2 py-1 rounded bg-amber-600 text-slate-900 border border-amber-500"; }
+                } else {
+                    if (bomAirVolTubing > 0.5 && activeQ > 0) {
+                        pres = 0;
+                        if(lblPres) lblPres.innerText = "Bombeando al Vacío (Caída Libre)";
+                        if(containerPres) containerPres.className = "glass-panel p-3 text-center border-t-2 border-t-slate-500 flex flex-col justify-center shadow-lg transition-colors duration-300";
+                        if(statBadge) { statBadge.innerText = "LLENANDO VACÍO"; statBadge.className = "text-[0.65rem] font-bold px-2 py-1 rounded bg-slate-600 text-white border border-slate-500"; }
+                    } else {
+                        pres += (activeQ * (1 + (avgVisc * 0.05))); 
+                        if (!bomAnnulusOpen) pres += (activeQ * 12); 
+                        if(containerPres) containerPres.className = "glass-panel p-3 text-center border-t-2 border-t-rose-500 flex flex-col justify-center shadow-lg transition-colors duration-300";
+                        if(lblPres) lblPres.innerText = "Presión Superficie";
+                        if(statBadge) { 
+                            statBadge.innerText = (!bomAnnulusOpen && activeQ > 0) ? "INYECCIÓN / SQUEEZE" : (activeQ > 0 ? "CIRCULANDO FLUIDO" : "BOMBAS DETENIDAS");
+                            statBadge.className = (!bomAnnulusOpen && activeQ > 0) ? "text-[0.65rem] font-bold px-2 py-1 rounded bg-indigo-600 text-white border border-indigo-500" : (activeQ > 0 ? "text-[0.65rem] font-bold px-2 py-1 rounded bg-emerald-600 text-white border border-emerald-500" : "text-[0.65rem] font-bold px-2 py-1 rounded bg-slate-600 text-white border border-slate-500");
+                        }
+                    }
+                }
+
+                if (activeQ === 0 && bomCurrentEvent !== 'tapado') {
+                    pres = bomAirVolTubing > 0 ? 0 : bomBasePressure;
+                }
+                bomCurrentPres = pres; 
+            }
+            
+            const elP = document.getElementById('bomOutPres'); if(elP) elP.innerText = Math.round(bomCurrentPres);
+
+            let trkStg = bomFluidStages.find(s => s.tracked);
+            if (trkStg) {
+                const elFN = document.getElementById('bomOutFluidName'); if(elFN) { elFN.innerText = trkStg.name; elFN.style.color = trkStg.color; }
+                let activeId = trkStg.id;
+                let mdPunta = 0; let volToTip = 0; let volToSurf = 0; let foundMD = false;
+                
+                if (bomDirFlow === 'Directa') {
+                    let sumVol = 0;
+                    for(let i=0; i<bomStackTubing.length; i++) { 
+                        sumVol += bomStackTubing[i].vol; 
+                        if (bomStackTubing[i].stageId === activeId) { 
+                            mdPunta = getMDFromVol(sumVol + bomAirVolTubing, bomSys.tubProfile); 
+                            foundMD = true; 
+                            volToTip = Math.max(0, bomSys.tubVol - bomAirVolTubing - sumVol); 
+                            volToSurf = volToTip + (bomSys.annVol - bomAirVolAnnulus); 
+                        } 
+                    }
+                    if (!foundMD && bomStackAnnulus.length > 0) {
+                        let annSumVol = 0; 
+                        for(let i=0; i<bomStackAnnulus.length; i++) { 
+                            annSumVol += bomStackAnnulus[i].vol; 
+                            if(bomStackAnnulus[i].stageId === activeId) { 
+                                mdPunta = bomSys.maxMD - getMDFromVol(annSumVol, [...bomSys.annProfile].reverse()); 
+                                foundMD = true;
+                                volToTip = 0; 
+                                volToSurf = Math.max(0, (bomSys.annVol - bomAirVolAnnulus) - annSumVol); 
+                            } 
+                        }
+                    }
+                    if (!foundMD && bomTargetStack.length > 0) {
+                        let targSum = 0; 
+                        for(let i=0; i<bomTargetStack.length; i++) { 
+                            targSum += bomTargetStack[i].vol; 
+                            if(bomTargetStack[i].stageId === activeId) { 
+                                mdPunta = bomTargetTop + ((targSum / bomTargetCapacity) * (bomTargetBottom - bomTargetTop)); 
+                                foundMD = true;
+                                volToTip = 0; volToSurf = 0; 
+                            } 
+                        }
+                    }
+                    const lP = document.getElementById('bomLblVolPunta'); if(lP) lP.innerText = "Vol a Punta Sarta:"; 
+                    const lS = document.getElementById('bomLblVolSup'); if(lS) lS.innerText = "Vol a Superficie:";
+                } else {
+                    let annSum = 0;
+                    for(let i=bomStackAnnulus.length-1; i>=0; i--) { 
+                        annSum += bomStackAnnulus[i].vol; 
+                        if (bomStackAnnulus[i].stageId === activeId) { 
+                            mdPunta = getMDFromVol(annSum + bomAirVolAnnulus, bomSys.annProfile); 
+                            foundMD = true; 
+                            volToTip = Math.max(0, bomSys.annVol - bomAirVolAnnulus - annSum); 
+                            volToSurf = volToTip + (bomSys.tubVol - bomAirVolTubing); 
+                        } 
+                    }
+                    if (!foundMD && bomStackTubing.length > 0) {
+                        let tubSumVol = 0; 
+                        for(let i=bomStackTubing.length-1; i>=0; i--) { 
+                            tubSumVol += bomStackTubing[i].vol; 
+                            if(bomStackTubing[i].stageId === activeId) { 
+                                mdPunta = bomSys.maxMD - getMDFromVol(tubSumVol, [...bomSys.tubProfile].reverse()); 
+                                foundMD = true;
+                                volToTip = 0; 
+                                volToSurf = Math.max(0, (bomSys.tubVol - bomAirVolTubing) - tubSumVol); 
+                            } 
+                        }
+                    }
+                    const lP = document.getElementById('bomLblVolPunta'); if(lP) lP.innerText = "Vol a Fondo (Anular):"; 
+                    const lS = document.getElementById('bomLblVolSup'); if(lS) lS.innerText = "Vol a Sup. (Tubería):";
+                }
+
+                if(!foundMD && (trkStg.pumped || 0) > 0) mdPunta = 0; 
+                if(!foundMD && (!trkStg.pumped || trkStg.pumped === 0)) mdPunta = 0; 
+
+                const outMD = document.getElementById('bomOutMD'); if(outMD) outMD.innerText = Math.round(mdPunta) + " ft";
+                const outVT = document.getElementById('bomOutVolToTip'); if(outVT) outVT.innerText = volToTip.toFixed(1) + " bbl";
+                const outVS = document.getElementById('bomOutVolToSurf'); if(outVS) outVS.innerText = volToSurf.toFixed(1) + " bbl";
+
+                if(bomAutoTrack && foundMD) {
+                    let tvTop = Math.max(0, mdPunta - 1000); let tvBottom = Math.min(bomSys.maxMD, tvTop + 2500);
+                    if (tvBottom === bomSys.maxMD) tvTop = Math.max(0, bomSys.maxMD - 2500);
+                    currentVTop += (tvTop - currentVTop) * 0.1; currentVBottom += (tvBottom - currentVBottom) * 0.1;
+                } else if (bomAutoTrack) {
+                    currentVTop += (0 - currentVTop) * 0.1; currentVBottom += (bomSys.maxMD - currentVBottom) * 0.1;
+                }
+            } else {
+                const outMD = document.getElementById('bomOutMD'); if(outMD) outMD.innerText = "-- ft"; 
+                const outFN = document.getElementById('bomOutFluidName'); if(outFN) outFN.innerText = "Ninguno"; 
+                const outVT = document.getElementById('bomOutVolToTip'); if(outVT) outVT.innerText = "-- bbl"; 
+                const outVS = document.getElementById('bomOutVolToSurf'); if(outVS) outVS.innerText = "-- bbl";
+                if(bomAutoTrack) { currentVTop += (0 - currentVTop) * 0.1; currentVBottom += (bomSys.maxMD - currentVBottom) * 0.1; }
+            }
+        }
+
+        function bomDraw() {
+            if (!bomEngine.ctx) return; let ctx = bomEngine.ctx; let W = bomEngine.width; let H = bomEngine.height; 
+            ctx.clearRect(0, 0, W, H); 
+            
+            let viewRange = currentVBottom - currentVTop;
+            if(viewRange < 10) viewRange = 10;
+            let scaleY = (H - 40) / viewRange; 
+            let cX = W / 2;
+            
+            const getPipeGradient = (x, w, isInternal) => {
+                let grad = ctx.createLinearGradient(x, 0, x + w, 0);
+                if(isInternal) {
+                    grad.addColorStop(0, '#020617'); grad.addColorStop(0.2, '#1e293b'); grad.addColorStop(0.8, '#1e293b'); grad.addColorStop(1, '#020617');
+                } else {
+                    grad.addColorStop(0, '#0f172a'); grad.addColorStop(0.1, '#64748b'); grad.addColorStop(0.3, '#cbd5e1'); grad.addColorStop(0.8, '#334155'); grad.addColorStop(1, '#020617');
+                }
+                return grad;
+            };
+
+            const timeOffset = (Date.now() / 50);
+
+            const drawFluidBlock = (x, y, w, h, color, mw, visc) => {
+                let grad = ctx.createLinearGradient(x, 0, x + w, 0);
+                grad.addColorStop(0, darken(color, 60));
+                grad.addColorStop(0.2, color);
+                grad.addColorStop(0.5, lighten(color, 40));
+                grad.addColorStop(0.8, color);
+                grad.addColorStop(1, darken(color, 80));
+                
+                ctx.fillStyle = grad;
+                ctx.fillRect(x, y, w, h);
+
+                if (visc < 5 && mw < 9.5) {
+                    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+                    for(let i=0; i<(h/10); i++) {
+                        let py = y + h - ((i * 15 + timeOffset) % h);
+                        let px = x + w/2 + Math.sin(py/10)* (w/4);
+                        ctx.beginPath(); ctx.arc(px, py, 1.5, 0, Math.PI*2); ctx.fill();
+                    }
+                } else if (mw > 14 || visc > 50) {
+                    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+                    for(let i=0; i<(h/5); i++) {
+                        let py = y + ((i * 10 + timeOffset * 0.5) % h);
+                        let px = x + w/2 + Math.cos(py/15)* (w/3);
+                        ctx.fillRect(px, py, 1.5, 1.5);
+                    }
+                }
+            };
+
+            ctx.fillStyle = '#475569'; ctx.font = '10px Segoe UI'; ctx.textAlign = 'right';
+            let step = Math.pow(10, Math.floor(Math.log10(viewRange)));
+            if(viewRange / step < 2) step /= 5; else if(viewRange / step < 5) step /= 2;
+            let firstTick = Math.ceil(currentVTop / step) * step;
+            for(let md = firstTick; md <= currentVBottom; md += step) {
+                let y = 20 + (md - currentVTop) * scaleY;
+                if(y >= 20 && y <= H-20) { ctx.fillText(md.toFixed(0) + "'", 45, y + 3); ctx.fillStyle = 'rgba(71, 85, 105, 0.2)'; ctx.fillRect(50, y, W-50, 1); ctx.fillStyle = '#475569'; }
+            }
+
+            let bType = document.getElementById('bomInpBottomType')?.value || 'formacion';
+            let ty = 20 + (bomTargetTop - currentVTop) * scaleY; let th = (bomTargetBottom - bomTargetTop) * scaleY;
+            if(ty + th > 20 && ty < H - 20) {
+                if(bType === 'formacion') {
+                    ctx.fillStyle = 'rgba(16, 185, 129, 0.1)'; ctx.fillRect(cX - 55, ty, 110, th);
+                    ctx.strokeStyle = '#10b981'; ctx.lineWidth = 1; ctx.strokeRect(cX - 55, ty, 110, th);
+                    ctx.fillStyle = '#10b981'; ctx.textAlign = 'left'; ctx.fillText('PUNZADOS / FORMACIÓN', cX + 60, ty + 10);
+                } else {
+                    ctx.fillStyle = 'rgba(239, 68, 68, 0.5)'; ctx.fillRect(cX - 55, ty, 110, th);
+                    ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 2; ctx.strokeRect(cX - 55, ty, 110, th);
+                    ctx.fillStyle = '#ef4444'; ctx.textAlign = 'left'; ctx.fillText('TAPÓN / PESCADO (TOF)', cX + 60, ty + 10);
+                }
+            }
+            
+            let currTargVol = 0;
+            for(let i=bomTargetStack.length-1; i>=0; i--) { let block = bomTargetStack[i]; let fillH = (block.vol / bomTargetCapacity) * th; let fillY = ty + th - ((currTargVol + block.vol)/bomTargetCapacity)*th; drawFluidBlock(cX - 55, fillY, 110, fillH, block.color, block.mw, block.visc); currTargVol += block.vol; }
+
+            bomSys.annProfile.forEach(sec => { let y = 20 + (sec.top - currentVTop) * scaleY; let h = (sec.bottom - sec.top) * scaleY; let w = sec.dh * 4; ctx.fillStyle = getPipeGradient(cX - w/2, w, false); ctx.fillRect(cX - w/2, y, w, h); ctx.strokeStyle = '#020617'; ctx.lineWidth = 1; ctx.strokeRect(cX - w/2, y, w, h); });
+            bomSys.tubProfile.forEach(sec => { let y = 20 + (sec.top - currentVTop) * scaleY; let h = (sec.bottom - sec.top) * scaleY; let w = sec.od * 4; let inW = sec.id * 4; ctx.fillStyle = getPipeGradient(cX - w/2, w, false); ctx.fillRect(cX - w/2, y, w, h); ctx.fillStyle = getPipeGradient(cX - inW/2, inW, true); ctx.fillRect(cX - inW/2, y, inW, h); });
+
+            let mixVisualLimit = Math.min(bomStaticTime / 100, 40); 
+
+            let currTubVol = 0;
+            for(let i=0; i<bomStackTubing.length; i++) { 
+                let block = bomStackTubing[i]; 
+                let topMD = getMDFromVol(currTubVol + bomAirVolTubing, bomSys.tubProfile); 
+                let bottomMD = getMDFromVol(currTubVol + bomAirVolTubing + block.vol, bomSys.tubProfile); 
+                let y = 20 + (topMD - currentVTop) * scaleY; 
+                let h = (bottomMD - topMD) * scaleY; 
+                let tubSec = bomSys.tubProfile.find(s => s.top <= topMD && s.bottom > topMD) || bomSys.tubProfile[0]; 
+                let inW = (tubSec ? tubSec.id : 2.5) * 4; 
+                
+                drawFluidBlock(cX - inW/2 + 1, y, inW - 2, h, block.color, block.mw, block.visc);
+                
+                if (i > 0 && mixVisualLimit > 0) {
+                    let prevBlock = bomStackTubing[i-1]; 
+                    if ((prevBlock.mw || 0) > (block.mw || 0)) { 
+                        let mixG = ctx.createLinearGradient(0, y - mixVisualLimit, 0, y + mixVisualLimit);
+                        mixG.addColorStop(0, prevBlock.color); mixG.addColorStop(1, block.color);
+                        ctx.fillStyle = mixG;
+                        ctx.fillRect(cX - inW/2 + 1, y - mixVisualLimit, inW - 2, mixVisualLimit * 2);
+                    }
+                }
+                currTubVol += block.vol; 
+            }
+
+            let currAnnVol = 0; let revAnnProfile = [...bomSys.annProfile].reverse(); let botUpProfile = revAnnProfile.map(s => ({ top: bomSys.maxMD - s.bottom, bottom: bomSys.maxMD - s.top, cap: s.cap, vol: s.vol, dh: s.dh, dp: s.dp }));
+            for(let i=0; i<bomStackAnnulus.length; i++) { 
+                let block = bomStackAnnulus[i]; 
+                let botUpTop = getMDFromVol(currAnnVol + bomAirVolAnnulus, botUpProfile); 
+                let botUpBottom = getMDFromVol(currAnnVol + bomAirVolAnnulus + block.vol, botUpProfile); 
+                let bottomMD = bomSys.maxMD - botUpTop; 
+                let topMD = bomSys.maxMD - botUpBottom; 
+                let y = 20 + (topMD - currentVTop) * scaleY; 
+                let h = (bottomMD - topMD) * scaleY; 
+                let annSec = bomSys.annProfile.find(s => s.top <= topMD && s.bottom > topMD) || bomSys.annProfile[0]; 
+                let dhW = (annSec ? annSec.dh : 6) * 4; let dpW = (annSec ? annSec.dp : 2.875) * 4; 
+                
+                drawFluidBlock(cX - dhW/2 + 1, y, (dhW/2 - dpW/2) - 1, h, block.color, block.mw, block.visc);
+                drawFluidBlock(cX + dpW/2 + 1, y, (dhW/2 - dpW/2) - 1, h, block.color, block.mw, block.visc);
+                
+                if (i > 0 && mixVisualLimit > 0) {
+                    let prevBlock = bomStackAnnulus[i-1]; 
+                    if ((prevBlock.mw || 0) < (block.mw || 0)) { 
+                        let mixG = ctx.createLinearGradient(0, y + h - mixVisualLimit, 0, y + h + mixVisualLimit);
+                        mixG.addColorStop(0, block.color); mixG.addColorStop(1, prevBlock.color);
+                        ctx.fillStyle = mixG;
+                        ctx.fillRect(cX - dhW/2 + 1, y + h - mixVisualLimit, (dhW/2 - dpW/2) - 1, mixVisualLimit * 2);
+                        ctx.fillRect(cX + dpW/2 + 1, y + h - mixVisualLimit, (dhW/2 - dpW/2) - 1, mixVisualLimit * 2);
+                    }
+                }
+                currAnnVol += block.vol; 
+            }
+            
+            let pbtdY = 20 + (bomSys.maxMD - currentVTop) * scaleY;
+            if(pbtdY > 20 && pbtdY < H - 20) { ctx.fillStyle = '#ef4444'; ctx.fillRect(cX - 40, pbtdY, 80, 8); ctx.fillStyle = '#fff'; ctx.font = '8px Arial'; ctx.textAlign = 'center'; ctx.fillText('PBTD', cX, pbtdY + 6); }
+
+            let bopY = 20 + (0 - currentVTop) * scaleY;
+            if (!bomAnnulusOpen && bopY > 0 && bopY < H) { ctx.fillStyle = '#ef4444'; ctx.fillRect(cX - 35, bopY-5, 70, 10); ctx.fillStyle = '#fff'; ctx.font = '8px Arial'; ctx.textAlign = 'center'; ctx.fillText('BOP CERRADA', cX, bopY+3); }
+        }
+
+        async function conectarHardwareUSB() {
+            if (!("serial" in navigator)) {
+                showMsg("Tu navegador no soporta Web Serial API. Usa Google Chrome o Edge en Windows/Mac.", false);
+                return;
+            }
+            try {
+                usbPort = await navigator.serial.requestPort();
+                await usbPort.open({ baudRate: 9600 });
+                usbActive = true;
+                
+                document.getElementById('btnConnectUSB').innerHTML = "🟢 CONECTADO (COM)";
+                document.getElementById('btnConnectUSB').className = "text-[0.6rem] bg-emerald-900 text-emerald-300 border border-emerald-500 px-3 py-1 rounded uppercase tracking-wider transition flex items-center gap-1 shadow animate-pulse";
+                document.getElementById('bomSliderQ').disabled = true;
+                document.getElementById('bomSensorQ').disabled = true;
+
+                const textDecoder = new TextDecoderStream();
+                const readableStreamClosed = usbPort.readable.pipeTo(textDecoder.writable);
+                usbReader = textDecoder.readable.getReader();
+
+                let buffer = "";
+                while (true) {
+                    const { value, done } = await usbReader.read();
+                    if (done) { usbReader.releaseLock(); break; }
+                    buffer += value;
+                    let lines = buffer.split('\n');
+                    buffer = lines.pop(); 
+                    
+                    for (let line of lines) {
+                        procesarTramaUSB(line.trim());
+                    }
+                }
+            } catch (error) {
+                usbActive = false;
+                document.getElementById('btnConnectUSB').innerHTML = "🔌 Conectar COM";
+                document.getElementById('btnConnectUSB').className = "text-[0.6rem] bg-indigo-900 text-indigo-300 border border-indigo-500 px-3 py-1 rounded uppercase tracking-wider hover:bg-indigo-700 transition flex items-center gap-1 shadow";
+                document.getElementById('bomSliderQ').disabled = false;
+                document.getElementById('bomSensorQ').disabled = false;
+                console.error("Error USB:", error);
+            }
+        }
+
+        function procesarTramaUSB(line) {
+            if(!line) return;
+            try {
+                let parts = line.split(',');
+                if (parts.length >= 2) {
+                    let hwQ = parseFloat(parts[0]);
+                    let hwP = parseFloat(parts[1]);
+                    
+                    if (!isNaN(hwQ)) {
+                        bomQ = hwQ;
+                        document.getElementById('bomSensorQ').value = bomQ.toFixed(1);
+                        document.getElementById('bomSliderQ').value = bomQ;
+                    }
+                    if (!isNaN(hwP)) {
+                        bomCurrentPres = hwP; 
+                        let elP = document.getElementById('bomOutPres');
+                        if (elP) elP.innerText = Math.round(hwP);
+                    }
+                }
+            } catch(e) {}
+        }
+
+        function exportarCSV() {
+            if (bomDaqData.length === 0) {
+                showMsg("No hay datos de bombeo para exportar.", false);
+                return;
+            }
+            
+            let csvContent = "data:text/csv;charset=utf-8,";
+            csvContent += "Tiempo_Seg,Caudal_GPM,Presion_PSI,Vol_Bombeado_BBL,Vol_Etapa_BBL\n";
+            
+            bomDaqData.forEach(function(rowArray) {
+                let row = `${(rowArray.t / 1000).toFixed(1)},${rowArray.q.toFixed(1)},${rowArray.p.toFixed(1)},${rowArray.vt.toFixed(1)},${rowArray.ve.toFixed(1)}`;
+                csvContent += row + "\r\n";
+            });
+
+            var encodedUri = encodeURI(csvContent);
+            var link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `Historial_Bombeo_${currentProjectName.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0,10)}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function abrirVisorCSV() {
+            document.getElementById('dashboardView').classList.add('hidden');
+            document.getElementById('dashboardView').classList.remove('flex');
+            document.getElementById('csvAnalysisView').classList.remove('hidden');
+            document.getElementById('csvAnalysisView').classList.add('flex');
+        }
+
+        function cerrarVisorCSV() {
+            document.getElementById('csvAnalysisView').classList.add('hidden');
+            document.getElementById('csvAnalysisView').classList.remove('flex');
+            document.getElementById('dashboardView').classList.remove('hidden');
+            document.getElementById('dashboardView').classList.add('flex');
+            document.getElementById('csvResultsPanel').classList.add('hidden');
+            document.getElementById('csvResultsPanel').classList.remove('flex');
+            document.getElementById('csvFileInput').value = '';
+        }
+
+        function procesarArchivoCSV(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const text = e.target.result;
+                const lines = text.split('\n');
+                if (lines.length < 2) {
+                    showMsg("El archivo CSV está vacío o es inválido.", false);
+                    return;
+                }
+
+                let maxQ = 0, maxP = 0, maxV = 0;
+                let parsedData = [];
+
+                for (let i = 1; i < lines.length; i++) {
+                    const row = lines[i].trim();
+                    if (!row) continue;
+                    const cols = row.split(',');
+                    if (cols.length >= 4) {
+                        let t = parseFloat(cols[0]);
+                        let q = parseFloat(cols[1]);
+                        let p = parseFloat(cols[2]);
+                        let v = parseFloat(cols[3]);
+                        
+                        if(!isNaN(t) && !isNaN(q) && !isNaN(p) && !isNaN(v)) {
+                            parsedData.push({ t, q, p, v });
+                            if (q > maxQ) maxQ = q;
+                            if (p > maxP) maxP = p;
+                            if (v > maxV) maxV = v;
+                        }
+                    }
+                }
+
+                document.getElementById('csvMaxQ').innerText = maxQ.toFixed(1) + " GPM";
+                document.getElementById('csvMaxP').innerText = maxP.toFixed(1) + " PSI";
+                document.getElementById('csvTotalV').innerText = maxV.toFixed(1) + " bbl";
+
+                document.getElementById('csvResultsPanel').classList.remove('hidden');
+                document.getElementById('csvResultsPanel').classList.add('flex');
+
+                dibujarGraficoCSV(parsedData, maxQ, maxP);
+            };
+            reader.readAsText(file);
+        }
+
+        function dibujarGraficoCSV(data, maxQ, maxP) {
+            const canvas = document.getElementById('csvChartCanvas');
+            const rect = canvas.parentElement.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+            const ctx = canvas.getContext('2d');
+            
+            const W = canvas.width; const H = canvas.height;
+            ctx.clearRect(0, 0, W, H);
+
+            ctx.strokeStyle = 'rgba(255,255,255,0.1)'; ctx.lineWidth = 1;
+            ctx.beginPath();
+            for(let i=1; i<5; i++) { let y = (H/5)*i; ctx.moveTo(0, y); ctx.lineTo(W, y); }
+            ctx.stroke();
+
+            if (data.length < 2) return;
+
+            let stepX = W / data.length;
+            let drawLine = (key, color, scaleMax) => {
+                ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = 2;
+                for (let i = 0; i < data.length; i++) {
+                    let x = i * stepX;
+                    let y = H - (data[i][key] / scaleMax) * (H - 20) - 10;
+                    if(i===0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                }
+                ctx.stroke();
+            };
+
+            drawLine('q', '#ec4899', maxQ * 1.2 || 100); 
+            drawLine('p', '#06b6d4', maxP * 1.2 || 1000); 
+
+            ctx.fillStyle = '#fff'; ctx.font = '10px Arial';
+            ctx.fillText("■ Caudal (Rosa)", 10, 20);
+            ctx.fillText("■ Presión (Cian)", 10, 35);
+        }
+
+        window.onload = function() {
+            const lv = document.getElementById('loginView');
+            if(lv) { lv.classList.remove('hidden'); lv.classList.add('flex'); }
+            
+            if(typeof bomEngine !== 'undefined') bomEngine.init();
+            if(typeof bomDaqEngine !== 'undefined') bomDaqEngine.init(); 
+            
+            bomResetSections();
+            requestAnimationFrame(bomLoop); // El motor corre de fondo continuamente
+        };
+    </script>
+</body>
+</html>
